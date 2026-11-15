@@ -133,6 +133,63 @@ export default function RoomDrawer({
   const [confirmDeleteTenant, setConfirmDeleteTenant] = useState(false);
   const [confirmDeleteRoom, setConfirmDeleteRoom] = useState(false);
 
+  // Bottom Sheet Gestures & Drag State
+  const touchStartY = useRef<number | null>(null);
+  const touchCurrentY = useRef<number | null>(null);
+  const isDragging = useRef<boolean>(false);
+  const [dragOffset, setDragOffset] = useState<number>(0);
+  const sheetRef = useRef<HTMLElement | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const scrollTop = sheetRef.current ? sheetRef.current.scrollTop : 0;
+    if (scrollTop <= 5) {
+      touchStartY.current = e.touches[0].clientY;
+      touchCurrentY.current = e.touches[0].clientY;
+      isDragging.current = true;
+    } else {
+      touchStartY.current = null;
+      touchCurrentY.current = null;
+      isDragging.current = false;
+    }
+  };
+
+  const handleDragHandleTouchStart = (e: React.TouchEvent) => {
+    touchStartY.current = e.touches[0].clientY;
+    touchCurrentY.current = e.touches[0].clientY;
+    isDragging.current = true;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isDragging.current || touchStartY.current === null) return;
+    const currentY = e.touches[0].clientY;
+    touchCurrentY.current = currentY;
+    const deltaY = currentY - touchStartY.current;
+    if (deltaY > 0) {
+      setDragOffset(deltaY);
+    } else {
+      setDragOffset(0);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (isDragging.current && touchStartY.current !== null && touchCurrentY.current !== null) {
+      const deltaY = touchCurrentY.current - touchStartY.current;
+      if (deltaY > 70) {
+        triggerHaptic("light");
+        onClose();
+      }
+    }
+    touchStartY.current = null;
+    touchCurrentY.current = null;
+    isDragging.current = false;
+    setDragOffset(0);
+  };
+
+  // Cuộn mượt trường nhập vào giữa màn hình khi mở bàn phím ảo
+  const handleInputFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+    (e.target as HTMLElement).scrollIntoView({ behavior: "smooth", block: "center" });
+  };
+
   const startEdit = () => {
     if (!shown) return;
     setDraftTenant(shown.tenant || "");
@@ -261,25 +318,48 @@ export default function RoomDrawer({
       {open && (
         <div
           className="fixed inset-0 z-40 bg-slate-950/50 backdrop-blur-xs md:hidden"
-          onClick={onClose}
+          onClick={() => {
+            triggerHaptic("light");
+            onClose();
+          }}
         />
       )}
 
       <aside
+        ref={sheetRef}
         aria-hidden={!open}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        style={{
+          transform:
+            dragOffset > 0 && open
+              ? `translateY(${dragOffset}px)`
+              : undefined,
+        }}
         className={cn(
-          "fixed z-50 flex flex-col bg-white shadow-2xl transition-transform duration-300 ease-out",
-          // Mobile: Bottom Sheet trượt từ đáy lên
-          "inset-x-0 bottom-0 max-h-[88dvh] w-full rounded-t-3xl border-t border-slate-200 pb-[calc(1rem+env(safe-area-inset-bottom,0px))]",
+          "fixed z-50 flex flex-col bg-white shadow-2xl",
+          // Mobile: Bottom Sheet Native bo góc trên
+          "rounded-t-2xl max-h-[88vh] fixed inset-x-0 bottom-0 shadow-2xl overflow-y-auto border-t border-slate-200 pb-[calc(1rem+env(safe-area-inset-bottom,0px))]",
+          dragOffset > 0 ? "transition-none" : "transition-transform duration-300 ease-out",
           open ? "translate-y-0" : "translate-y-full pointer-events-none",
           // Desktop: Side-drawer bên phải
-          "md:inset-auto md:right-0 md:top-[72px] md:bottom-auto md:h-[calc(100dvh-72px)] md:w-[420px] md:rounded-none md:border-l md:border-t-0 md:pb-0 md:translate-y-0",
+          "md:inset-auto md:right-0 md:top-[72px] md:bottom-auto md:h-[calc(100dvh-72px)] md:w-[420px] md:rounded-none md:border-l md:border-t-0 md:pb-0 md:max-h-none md:overflow-y-visible",
           open ? "md:translate-x-0 md:pointer-events-auto" : "md:translate-x-full md:pointer-events-none"
         )}
       >
         {/* Mobile Drag Handle */}
-        <div className="w-full pt-3 pb-1 flex justify-center md:hidden" onClick={onClose}>
-          <div className="h-1.5 w-12 rounded-full bg-slate-300 active:scale-95 transition-transform" />
+        <div
+          className="w-full pt-2 pb-1 flex justify-center md:hidden cursor-grab active:cursor-grabbing select-none"
+          onTouchStart={handleDragHandleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          onClick={() => {
+            triggerHaptic("light");
+            onClose();
+          }}
+        >
+          <div className="w-12 h-1.5 bg-slate-400/40 rounded-full mx-auto my-2 active:scale-95 transition-transform" />
         </div>
 
         {shown && (
@@ -307,15 +387,18 @@ export default function RoomDrawer({
               </div>
               <button
                 type="button"
-                onClick={onClose}
+                onClick={() => {
+                  triggerHaptic("light");
+                  onClose();
+                }}
                 aria-label="Đóng"
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                className="relative flex min-h-[48px] min-w-[48px] shrink-0 items-center justify-center rounded-xl text-slate-400 hover:bg-slate-100 hover:text-slate-600 active:scale-[0.96] transition-transform duration-150 select-none touch-manipulation"
               >
-                <X className="w-4 h-4 shrink-0" />
+                <X className="w-5 h-5 shrink-0" />
               </button>
             </div>
 
-            <div className="thin-scroll flex-1 overflow-y-auto px-6 py-4 space-y-4">
+            <div className="thin-scroll flex-1 md:overflow-y-auto px-6 py-4 space-y-4">
               {/* Người thuê & Thông tin Zalo */}
               <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3.5">
                 <div className="flex items-start justify-between mb-2">
@@ -339,35 +422,44 @@ export default function RoomDrawer({
                   </div>
 
                   {!isEditingTenant && (
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-2">
                       {!isEmpty ? (
                         <>
                           <button
                             type="button"
-                            onClick={startEdit}
-                            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 active:scale-95"
+                            onClick={() => {
+                              triggerHaptic("light");
+                              startEdit();
+                            }}
+                            className="relative inline-flex min-h-[48px] min-w-[48px] items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 active:scale-[0.96] transition-transform duration-150 select-none touch-manipulation"
                             title="Chỉnh sửa thông tin khách thuê"
                           >
-                            <Edit3 className="w-3.5 h-3.5 shrink-0 text-slate-500" />
+                            <Edit3 className="w-4 h-4 shrink-0 text-slate-500" />
                             <span>Sửa</span>
                           </button>
                           <button
                             type="button"
-                            onClick={() => setConfirmDeleteTenant(true)}
-                            className="inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 text-[11px] font-semibold text-rose-700 hover:bg-rose-100 active:scale-95"
+                            onClick={() => {
+                              triggerHaptic("light");
+                              setConfirmDeleteTenant(true);
+                            }}
+                            className="relative inline-flex min-h-[48px] min-w-[48px] items-center justify-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-100 active:scale-[0.96] transition-transform duration-150 select-none touch-manipulation"
                             title="Xóa khách thuê khỏi phòng (Trả phòng)"
                           >
-                            <Trash2 className="w-3.5 h-3.5 shrink-0 text-rose-600" />
+                            <Trash2 className="w-4 h-4 shrink-0 text-rose-600" />
                             <span>Xóa khách</span>
                           </button>
                         </>
                       ) : (
                         <button
                           type="button"
-                          onClick={startEdit}
-                          className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-emerald-700 active:scale-95 shadow-2xs"
+                          onClick={() => {
+                            triggerHaptic("light");
+                            startEdit();
+                          }}
+                          className="relative inline-flex min-h-[48px] min-w-[48px] items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-bold text-white hover:bg-emerald-700 active:scale-[0.96] transition-transform duration-150 shadow-2xs select-none touch-manipulation"
                         >
-                          <UserPlus className="w-3.5 h-3.5 shrink-0" />
+                          <UserPlus className="w-4 h-4 shrink-0" />
                           <span>Thêm khách</span>
                         </button>
                       )}
@@ -388,15 +480,21 @@ export default function RoomDrawer({
                     <div className="flex justify-end gap-2">
                       <button
                         type="button"
-                        onClick={() => setConfirmDeleteTenant(false)}
-                        className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
+                        onClick={() => {
+                          triggerHaptic("light");
+                          setConfirmDeleteTenant(false);
+                        }}
+                        className="min-h-[48px] min-w-[48px] px-3.5 py-2 rounded-xl border border-slate-300 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 active:scale-[0.96] transition-transform duration-150 flex items-center justify-center select-none touch-manipulation"
                       >
                         Hủy
                       </button>
                       <button
                         type="button"
-                        onClick={handleExecuteRemoveTenant}
-                        className="rounded-lg bg-rose-600 px-3 py-1 text-[11px] font-bold text-white hover:bg-rose-700"
+                        onClick={() => {
+                          triggerHaptic("light");
+                          handleExecuteRemoveTenant();
+                        }}
+                        className="min-h-[48px] min-w-[48px] px-4 py-2 rounded-xl bg-rose-600 text-xs font-bold text-white hover:bg-rose-700 active:scale-[0.96] transition-transform duration-150 flex items-center justify-center select-none touch-manipulation"
                       >
                         Đồng ý xóa khách
                       </button>
@@ -416,20 +514,26 @@ export default function RoomDrawer({
                         <div className="flex items-center gap-2">
                           <button
                             type="button"
-                            onClick={() => openZaloAppOrWeb(shown.phone)}
-                            className="font-bold text-blue-600 hover:underline flex items-center gap-1 font-mono"
+                            onClick={() => {
+                              triggerHaptic("light");
+                              openZaloAppOrWeb(shown.phone);
+                            }}
+                            className="font-bold text-blue-600 hover:underline flex items-center gap-1 font-mono min-h-[48px] px-2.5 py-1.5 active:scale-[0.96] transition-transform duration-150 select-none touch-manipulation"
                             title="Bấm để mở Zalo chat"
                           >
                             {shown.phone}
-                            <MessageCircle className="w-3 h-3 shrink-0" />
+                            <MessageCircle className="w-3.5 h-3.5 shrink-0" />
                           </button>
                           <button
                             type="button"
-                            onClick={() => callPhoneNumber(shown.phone)}
-                            className="p-1 rounded-md text-emerald-600 hover:bg-emerald-50 transition-colors"
+                            onClick={() => {
+                              triggerHaptic("light");
+                              callPhoneNumber(shown.phone);
+                            }}
+                            className="min-h-[48px] min-w-[48px] flex items-center justify-center rounded-xl text-emerald-600 hover:bg-emerald-50 active:scale-[0.96] transition-transform duration-150 select-none touch-manipulation"
                             title="Bấm để gọi điện"
                           >
-                            <Phone className="w-3 h-3 shrink-0" />
+                            <Phone className="w-4 h-4 shrink-0" />
                           </button>
                         </div>
                       ) : (
@@ -463,20 +567,26 @@ export default function RoomDrawer({
                     <div className="flex items-center justify-center gap-2">
                       <button
                         type="button"
-                        onClick={startEdit}
-                        className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-2xs hover:bg-emerald-700 active:scale-95"
+                        onClick={() => {
+                          triggerHaptic("light");
+                          startEdit();
+                        }}
+                        className="inline-flex min-h-[48px] min-w-[48px] items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-2xs hover:bg-emerald-700 active:scale-[0.96] transition-transform duration-150 select-none touch-manipulation"
                       >
-                        <UserPlus className="w-3.5 h-3.5 shrink-0" />
+                        <UserPlus className="w-4 h-4 shrink-0" />
                         <span>+ Thêm Khách Mới</span>
                       </button>
                       {onDeleteRoom && (
                         <button
                           type="button"
-                          onClick={() => setConfirmDeleteRoom(true)}
-                          className="inline-flex items-center gap-1 rounded-xl border border-rose-200 bg-rose-50/50 px-2.5 py-1.5 text-[11px] font-semibold text-rose-600 hover:bg-rose-100"
+                          onClick={() => {
+                            triggerHaptic("light");
+                            setConfirmDeleteRoom(true);
+                          }}
+                          className="inline-flex min-h-[48px] min-w-[48px] items-center justify-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50/50 px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-100 active:scale-[0.96] transition-transform duration-150 select-none touch-manipulation"
                           title="Xóa phòng trống này khỏi tòa nhà 3D"
                         >
-                          <Trash2 className="w-3.5 h-3.5 shrink-0" />
+                          <Trash2 className="w-4 h-4 shrink-0" />
                           <span>Xóa phòng</span>
                         </button>
                       )}
@@ -490,15 +600,21 @@ export default function RoomDrawer({
                         <div className="flex gap-2">
                           <button
                             type="button"
-                            onClick={() => setConfirmDeleteRoom(false)}
-                            className="rounded-lg border px-2 py-0.5 text-[10px] text-slate-600"
+                            onClick={() => {
+                              triggerHaptic("light");
+                              setConfirmDeleteRoom(false);
+                            }}
+                            className="min-h-[48px] min-w-[48px] flex items-center justify-center rounded-xl border px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-50 active:scale-[0.96] transition-transform duration-150 select-none touch-manipulation"
                           >
                             Hủy
                           </button>
                           <button
                             type="button"
-                            onClick={handleExecuteDeleteRoom}
-                            className="rounded-lg bg-rose-600 px-2 py-0.5 text-[10px] font-bold text-white"
+                            onClick={() => {
+                              triggerHaptic("light");
+                              handleExecuteDeleteRoom();
+                            }}
+                            className="min-h-[48px] min-w-[48px] flex items-center justify-center rounded-xl bg-rose-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-rose-700 active:scale-[0.96] transition-transform duration-150 select-none touch-manipulation"
                           >
                             Xác nhận xóa
                           </button>
@@ -517,8 +633,9 @@ export default function RoomDrawer({
                         type="text"
                         value={draftTenant}
                         onChange={(e) => setDraftTenant(e.target.value)}
+                        onFocus={handleInputFocus}
                         placeholder="Nhập họ và tên khách"
-                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs outline-none focus:border-emerald-500 shadow-2xs"
+                        className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs outline-none focus:border-emerald-500 shadow-2xs min-h-[44px]"
                       />
                     </div>
                     <div>
@@ -527,8 +644,9 @@ export default function RoomDrawer({
                         type="tel"
                         value={draftPhone}
                         onChange={(e) => setDraftPhone(e.target.value)}
+                        onFocus={handleInputFocus}
                         placeholder="0912345678"
-                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs font-mono outline-none focus:border-emerald-500 shadow-2xs"
+                        className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-mono outline-none focus:border-emerald-500 shadow-2xs min-h-[44px]"
                       />
                     </div>
                     <div className="grid grid-cols-2 gap-2">
@@ -538,8 +656,9 @@ export default function RoomDrawer({
                           type="text"
                           value={draftZaloName}
                           onChange={(e) => setDraftZaloName(e.target.value)}
+                          onFocus={handleInputFocus}
                           placeholder="VD: Van An"
-                          className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs outline-none focus:border-emerald-500 shadow-2xs"
+                          className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs outline-none focus:border-emerald-500 shadow-2xs min-h-[44px]"
                         />
                       </div>
                       <div>
@@ -548,8 +667,9 @@ export default function RoomDrawer({
                           type="text"
                           value={draftIdCard}
                           onChange={(e) => setDraftIdCard(e.target.value)}
+                          onFocus={handleInputFocus}
                           placeholder="Số căn cước"
-                          className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs font-mono outline-none focus:border-emerald-500 shadow-2xs"
+                          className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-mono outline-none focus:border-emerald-500 shadow-2xs min-h-[44px]"
                         />
                       </div>
                     </div>
@@ -562,7 +682,8 @@ export default function RoomDrawer({
                           step={50000}
                           value={draftRoomFee}
                           onChange={(e) => setDraftRoomFee(Number(e.target.value))}
-                          className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs font-bold text-rose-600 outline-none focus:border-emerald-500 shadow-2xs"
+                          onFocus={handleInputFocus}
+                          className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-rose-600 outline-none focus:border-emerald-500 shadow-2xs min-h-[44px]"
                         />
                       </div>
                       <div>
@@ -571,8 +692,9 @@ export default function RoomDrawer({
                           type="text"
                           value={draftDueDate}
                           onChange={(e) => setDraftDueDate(e.target.value)}
+                          onFocus={handleInputFocus}
                           placeholder="dd/mm/yyyy"
-                          className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs outline-none focus:border-emerald-500 shadow-2xs"
+                          className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs outline-none focus:border-emerald-500 shadow-2xs min-h-[44px]"
                         />
                       </div>
                     </div>
@@ -582,22 +704,29 @@ export default function RoomDrawer({
                         type="text"
                         value={draftZaloNote}
                         onChange={(e) => setDraftZaloNote(e.target.value)}
+                        onFocus={handleInputFocus}
                         placeholder="Quê quán, nghề nghiệp, nơi làm..."
-                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs outline-none focus:border-emerald-500 shadow-2xs"
+                        className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs outline-none focus:border-emerald-500 shadow-2xs min-h-[44px]"
                       />
                     </div>
                     <div className="flex justify-end gap-2 pt-2">
                       <button
                         type="button"
-                        onClick={() => setIsEditingTenant(false)}
-                        className="rounded-lg border px-3 py-1 text-slate-600 hover:bg-slate-100"
+                        onClick={() => {
+                          triggerHaptic("light");
+                          setIsEditingTenant(false);
+                        }}
+                        className="min-h-[48px] min-w-[48px] flex items-center justify-center rounded-xl border px-3.5 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 active:scale-[0.96] transition-transform duration-150 select-none touch-manipulation"
                       >
                         Hủy
                       </button>
                       <button
                         type="button"
-                        onClick={saveEdit}
-                        className="rounded-lg bg-emerald-600 px-4 py-1 font-bold text-white hover:bg-emerald-700 shadow-2xs"
+                        onClick={() => {
+                          triggerHaptic("light");
+                          saveEdit();
+                        }}
+                        className="min-h-[48px] min-w-[48px] flex items-center justify-center rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700 active:scale-[0.96] transition-transform duration-150 shadow-2xs select-none touch-manipulation"
                       >
                         Lưu Thông Tin
                       </button>
@@ -639,10 +768,13 @@ export default function RoomDrawer({
 
                   <button
                     type="button"
-                    onClick={handleRenewOneMonth}
-                    className="mt-2.5 flex h-7 w-full items-center justify-center gap-1.5 rounded-xl border border-emerald-300 bg-white text-[11px] font-bold text-emerald-800 shadow-2xs hover:bg-emerald-50 active:scale-95"
+                    onClick={() => {
+                      triggerHaptic("light");
+                      handleRenewOneMonth();
+                    }}
+                    className="mt-2.5 flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl border border-emerald-300 bg-white px-3 py-2 text-xs font-bold text-emerald-800 shadow-2xs hover:bg-emerald-50 active:scale-[0.96] transition-transform duration-150 select-none touch-manipulation"
                   >
-                    <Sparkles className="w-3 h-3 shrink-0 text-emerald-600" />
+                    <Sparkles className="w-4 h-4 shrink-0 text-emerald-600" />
                     <span>Tự động gia hạn chu kỳ 1 tháng tiếp theo</span>
                   </button>
                 </div>
@@ -679,7 +811,8 @@ export default function RoomDrawer({
                                 onUpdateElectricNew(shown.id, val);
                               }
                             }}
-                            className="w-20 rounded-lg border border-slate-300 bg-white px-2 py-0.5 text-xs font-bold text-slate-900 outline-none focus:border-emerald-500"
+                            onFocus={handleInputFocus}
+                            className="w-24 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-900 outline-none focus:border-emerald-500 min-h-[40px]"
                           />
                           <span className="text-slate-400">kWh</span>
                         </div>
@@ -728,9 +861,9 @@ export default function RoomDrawer({
                     triggerHaptic("success");
                     onConfirmPayment(shown.id);
                   }}
-                  className="flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-xs font-bold text-white shadow-sm shadow-emerald-200 transition-all hover:bg-emerald-700 active:scale-[0.98]"
+                  className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-xs font-bold text-white shadow-sm shadow-emerald-200 transition-all hover:bg-emerald-700 active:scale-[0.96] duration-150 select-none touch-manipulation"
                 >
-                  <CheckCircle2 className="w-4 h-4 shrink-0" />
+                  <CheckCircle2 className="w-5 h-5 shrink-0" />
                   <span>Xác nhận đã thu tiền</span>
                 </button>
               )}
@@ -747,8 +880,11 @@ export default function RoomDrawer({
                     </div>
                     <button
                       type="button"
-                      onClick={() => setShowPreviewMessage((p) => !p)}
-                      className="text-[11px] font-bold text-indigo-600 hover:underline"
+                      onClick={() => {
+                        triggerHaptic("light");
+                        setShowPreviewMessage((p) => !p);
+                      }}
+                      className="min-h-[48px] min-w-[48px] flex items-center justify-center px-2 text-xs font-bold text-indigo-600 hover:underline active:scale-[0.96] transition-transform duration-150 select-none touch-manipulation"
                     >
                       {showPreviewMessage ? "Thu gọn" : "Xem nội dung"}
                     </button>
@@ -771,10 +907,13 @@ export default function RoomDrawer({
                       <p className="text-[11px] text-slate-500 truncate">{settings.bankName} • {settings.accountNumber}</p>
                       <button
                         type="button"
-                        onClick={() => downloadQrCodeImage(shown, settings)}
-                        className="mt-1 inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:text-blue-800"
+                        onClick={() => {
+                          triggerHaptic("light");
+                          downloadQrCodeImage(shown, settings);
+                        }}
+                        className="mt-1 inline-flex min-h-[48px] items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-800 active:scale-[0.96] transition-transform duration-150 select-none touch-manipulation"
                       >
-                        <Download className="w-3 h-3 shrink-0" />
+                        <Download className="w-3.5 h-3.5 shrink-0" />
                         <span>Tải ảnh mã QR về máy</span>
                       </button>
                     </div>
@@ -827,21 +966,27 @@ export default function RoomDrawer({
                   <div className="flex items-center justify-end gap-2 pt-1 border-t border-emerald-100/60">
                     <button
                       type="button"
-                      onClick={handleShareOrDownloadExcel}
-                      className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 hover:underline"
+                      onClick={() => {
+                        triggerHaptic("light");
+                        handleShareOrDownloadExcel();
+                      }}
+                      className="inline-flex min-h-[48px] min-w-[48px] items-center justify-center gap-1.5 text-xs font-semibold text-emerald-700 hover:underline active:scale-[0.96] transition-transform duration-150 select-none touch-manipulation"
                       title="Tải riêng file Excel"
                     >
-                      <FileSpreadsheet className="w-3 h-3" />
+                      <FileSpreadsheet className="w-4 h-4" />
                       <span>Excel</span>
                     </button>
                     <span className="text-slate-300">•</span>
                     <button
                       type="button"
-                      onClick={() => onDownloadReceiptImage?.(shown)}
-                      className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 hover:underline"
+                      onClick={() => {
+                        triggerHaptic("light");
+                        onDownloadReceiptImage?.(shown);
+                      }}
+                      className="inline-flex min-h-[48px] min-w-[48px] items-center justify-center gap-1.5 text-xs font-semibold text-amber-700 hover:underline active:scale-[0.96] transition-transform duration-150 select-none touch-manipulation"
                       title="Tải riêng ảnh phiếu thu PNG"
                     >
-                      <ImageIcon className="w-3 h-3" />
+                      <ImageIcon className="w-4 h-4" />
                       <span>Ảnh thu PNG</span>
                     </button>
                   </div>
@@ -857,7 +1002,7 @@ export default function RoomDrawer({
                 disabled={isEmpty || !shown.phone || isDispatching}
                 isLoading={isDispatching}
                 onClick={handleTriggerBundle4In1}
-                className="w-full text-sm font-bold shadow-md shadow-emerald-200/80 rounded-2xl h-12"
+                className="w-full text-sm font-bold shadow-md shadow-emerald-200/80 rounded-2xl min-h-[48px] h-12"
                 leftIcon={<Send className="w-4 h-4 shrink-0" />}
               >
                 <span>Gửi Hóa Đơn 4-trong-1</span>
@@ -866,13 +1011,13 @@ export default function RoomDrawer({
               <div className="grid grid-cols-2 gap-2 pt-0.5">
                 <TactileButton
                   variant="outline"
-                  size="sm"
+                  size="md"
                   disabled={isEmpty}
                   onClick={() => {
                     triggerHaptic("light");
                     onCopyReminder(shown);
                   }}
-                  className="text-xs font-semibold text-slate-700 rounded-xl"
+                  className="min-h-[48px] text-xs font-semibold text-slate-700 rounded-xl"
                   leftIcon={<Copy className="w-3.5 h-3.5 shrink-0 text-slate-500" />}
                   title="Sao chép tin nhắn đã tự động soạn kèm link ảnh mã QR"
                 >
@@ -881,13 +1026,13 @@ export default function RoomDrawer({
 
                 <TactileButton
                   variant="outline"
-                  size="sm"
+                  size="md"
                   disabled={isEmpty}
                   onClick={() => {
                     triggerHaptic("light");
                     onOpenZalo(shown);
                   }}
-                  className="text-xs font-semibold text-[#0068FF] border-blue-200 hover:bg-blue-50/60 rounded-xl"
+                  className="min-h-[48px] text-xs font-semibold text-[#0068FF] border-blue-200 hover:bg-blue-50/60 rounded-xl"
                   leftIcon={<Smartphone className="w-3.5 h-3.5 shrink-0 text-[#0068FF]" />}
                   title="Mở Zalo Mini App"
                 >

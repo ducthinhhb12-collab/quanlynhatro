@@ -18,7 +18,7 @@ import AdminControlModal, {
   STORAGE_KEY_ADMIN_SETTINGS,
 } from "./components/AdminControlModal";
 import ZaloAuthModal from "./components/ZaloAuthModal";
-import BottomNavBar, { type MobileTab } from "./components/BottomNavBar";
+import BottomNav, { type MobileTab } from "./components/BottomNavBar";
 import Toast from "./components/Toast";
 import { cn } from "./utils/cn";
 import {
@@ -228,6 +228,36 @@ export default function App() {
   const [mobileAppQrOpen, setMobileAppQrOpen] = useState(false);
   const [mobileTab, setMobileTab] = useState<MobileTab>("3d");
   const [toast, setToast] = useState<ToastState | null>(null);
+
+  // Lắng nghe window.visualViewport chống nổi bàn phím ảo
+  const [isVirtualKeyboardOpen, setIsVirtualKeyboardOpen] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const handleViewportResize = () => {
+      const vv = window.visualViewport;
+      const heightDiff = window.innerHeight - (vv?.height ?? window.innerHeight);
+      setIsVirtualKeyboardOpen(heightDiff > 120);
+    };
+
+    const vv = window.visualViewport;
+    if (vv) {
+      vv.addEventListener("resize", handleViewportResize);
+      vv.addEventListener("scroll", handleViewportResize);
+    }
+    window.addEventListener("resize", handleViewportResize);
+
+    handleViewportResize();
+
+    return () => {
+      if (vv) {
+        vv.removeEventListener("resize", handleViewportResize);
+        vv.removeEventListener("scroll", handleViewportResize);
+      }
+      window.removeEventListener("resize", handleViewportResize);
+    };
+  }, []);
 
   // Mở khóa âm thanh WebAudio trên iOS & Ẩn Splash Screen sau khi React 19 mount xong
   useEffect(() => {
@@ -1072,37 +1102,64 @@ export default function App() {
 
   const canShowReceipt = !!activeZaloRoom && activeZaloRoom.status !== "EMPTY";
 
-  return (
-    <div className="h-[100dvh] w-full overflow-hidden bg-slate-50 flex flex-col">
-      <Header
-        unpaidCount={unpaidCount}
-        tenantCount={rooms.filter((r) => r.status !== "EMPTY" && r.tenant).length}
-        onUpload={handleUpload}
-        onDownloadSample={handleDownloadSample}
-        onExportReport={handleExportReport}
-        onOpenAddRoom={() => setAddRoomOpen(true)}
-        onOpenCustomerManager={() => {
-          setCustomerManagerOpen(true);
-          setMobileTab("customers");
-        }}
-        onSimulatePayment={handleSimulatePayment}
-        onOpenSettings={() => {
-          setSettingsOpen(true);
-          setMobileTab("settings");
-        }}
-        onOpenMobileApp={() => setMobileAppQrOpen(true)}
-        onOpenAdmin={() => setAdminModalOpen(true)}
-        onOpenZaloAuth={() => setZaloAuthModalOpen(true)}
-        isZaloConnected={isZaloHostAuthorized(zaloSession)}
-        zaloHostName={zaloSession.hostName}
-      />
+  // Kiểm tra bất kỳ modal nào đang mở trên giao diện
+  const isAnyModalOpen =
+    adminModalOpen ||
+    zaloAuthModalOpen ||
+    settingsOpen ||
+    addRoomOpen ||
+    agentCompanyOpen ||
+    zaloOpen ||
+    batchReminderOpen ||
+    autoZaloSenderOpen ||
+    customerManagerOpen ||
+    mobileAppQrOpen;
 
-      <main className="relative flex-1 w-full overflow-hidden bg-slate-50 mt-[64px] md:mt-[72px] pb-[calc(64px+env(safe-area-inset-bottom,0px))] md:pb-0">
-        {/* 3D Canvas */}
+  // 3D Interaction Lock: Khóa khi RoomDrawer đang mở (selectedRoom !== null) hoặc bất kỳ modal nào đang mở
+  const is3DInteractionLocked = selectedRoom !== null || isAnyModalOpen;
+
+  return (
+    <div className="h-app-dvh h-[100dvh] w-full overflow-hidden bg-slate-50 flex flex-col">
+      {/* Thu gọn Header trên mobile thành thanh trạng thái tối giản, áp dụng safe-top */}
+      <div className="safe-top pt-[env(safe-area-inset-top,0px)] w-full shrink-0">
+        <Header
+          unpaidCount={unpaidCount}
+          tenantCount={rooms.filter((r) => r.status !== "EMPTY" && r.tenant).length}
+          onUpload={handleUpload}
+          onDownloadSample={handleDownloadSample}
+          onExportReport={handleExportReport}
+          onOpenAddRoom={() => setAddRoomOpen(true)}
+          onOpenCustomerManager={() => {
+            setCustomerManagerOpen(true);
+            setMobileTab("customers");
+          }}
+          onSimulatePayment={handleSimulatePayment}
+          onOpenSettings={() => {
+            setSettingsOpen(true);
+            setMobileTab("settings");
+          }}
+          onOpenMobileApp={() => setMobileAppQrOpen(true)}
+          onOpenAdmin={() => setAdminModalOpen(true)}
+          onOpenZaloAuth={() => setZaloAuthModalOpen(true)}
+          isZaloConnected={isZaloHostAuthorized(zaloSession)}
+          zaloHostName={zaloSession.hostName}
+        />
+      </div>
+
+      <main
+        className={cn(
+          "relative flex-1 w-full overflow-hidden bg-slate-50 mt-[calc(60px+env(safe-area-inset-top,0px))] md:mt-[72px]",
+          isVirtualKeyboardOpen
+            ? "pb-0"
+            : "pb-[calc(64px+env(safe-area-inset-bottom,0px))] md:pb-0"
+        )}
+      >
+        {/* 3D Canvas - Khóa tương tác chống xoay nhầm khi Drawer hoặc Modal mở */}
         <div
           className={cn(
             "absolute inset-y-0 left-0 right-0 transition-[right] duration-300 ease-out",
-            selectedRoom && "md:right-[410px]"
+            selectedRoom && "md:right-[410px]",
+            is3DInteractionLocked && "pointer-events-none touch-none select-none"
           )}
         >
           <Building3D
@@ -1117,19 +1174,7 @@ export default function App() {
               setSelectedId(id);
               setMobileTab("rooms");
             }}
-            isLocked={
-              !!selectedId ||
-              adminModalOpen ||
-              zaloAuthModalOpen ||
-              settingsOpen ||
-              addRoomOpen ||
-              zaloOpen ||
-              batchReminderOpen ||
-              autoZaloSenderOpen ||
-              customerManagerOpen ||
-              mobileAppQrOpen ||
-              agentCompanyOpen
-            }
+            isLocked={is3DInteractionLocked}
           />
         </div>
 
@@ -1360,13 +1405,15 @@ export default function App() {
         onSessionChange={(s) => setZaloSession(s)}
       />
 
-      {/* Thanh điều hướng đáy Native cho Mobile */}
-      <BottomNavBar
-        activeTab={mobileTab}
-        onTabChange={handleTabChange}
-        unpaidCount={unpaidCount}
-        tenantCount={rooms.filter((r) => r.status !== "EMPTY" && r.tenant).length}
-      />
+      {/* Thanh điều hướng đáy Native cho Mobile (Tự động ẩn khi bàn phím ảo mở để chống nổi) */}
+      {!isVirtualKeyboardOpen && (
+        <BottomNav
+          activeTab={mobileTab}
+          onTabChange={handleTabChange}
+          unpaidCount={unpaidCount}
+          tenantCount={rooms.filter((r) => r.status !== "EMPTY" && r.tenant).length}
+        />
+      )}
 
       <Toast toast={toast} />
     </div>

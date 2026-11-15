@@ -195,7 +195,7 @@ export const invokeBuildingSummaryNative = async (
   }
 
   return {
-    total_rooms: rooms.len ?? rooms.length,
+    total_rooms: rooms.length,
     occupied_rooms: occupiedRooms,
     empty_rooms: emptyRooms,
     paid_rooms: paidRooms,
