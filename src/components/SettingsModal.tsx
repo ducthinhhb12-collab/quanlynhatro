@@ -1,13 +1,32 @@
-import { useState, type FormEvent } from "react";
-import { Landmark, X, Zap, Save, RotateCcw, MessageCircle, Bot } from "lucide-react";
+import { useState, type FormEvent, type ChangeEvent } from "react";
+import {
+  Landmark,
+  X,
+  Zap,
+  Save,
+  RotateCcw,
+  MessageCircle,
+  Bot,
+  ShieldCheck,
+  Download,
+  Upload,
+} from "lucide-react";
 import { BANK_OPTIONS } from "../data/mockData";
-import type { Settings } from "../types";
+import type { Settings, Room } from "../types";
+import {
+  exportUserDataBackup,
+  parseUserDataBackup,
+  loadSafelyPreservedRooms,
+  savePreservedRooms,
+} from "../utils/userDataGuard";
+import { triggerHaptic } from "../utils/platformBridge";
 
 interface Props {
   settings: Settings;
   onSave: (next: Settings) => void;
   onResetDefault: () => void;
   onClose: () => void;
+  onReloadRooms?: (rooms: Room[]) => void;
 }
 
 const inputCls =
@@ -18,9 +37,50 @@ export default function SettingsModal({
   onSave,
   onResetDefault,
   onClose,
+  onReloadRooms,
 }: Props) {
   const [draft, setDraft] = useState<Settings>(settings);
   const [error, setError] = useState<string | null>(null);
+  const [backupMessage, setBackupMessage] = useState<string | null>(null);
+
+  const handleExportBackup = () => {
+    try {
+      triggerHaptic("medium");
+      const currentRooms = loadSafelyPreservedRooms();
+      exportUserDataBackup(currentRooms, draft);
+      setBackupMessage("✅ Đã xuất file sao lưu thành công! Hãy lưu file vào nơi an toàn.");
+      setTimeout(() => setBackupMessage(null), 4000);
+    } catch {
+      setError("Không thể xuất file sao lưu.");
+    }
+  };
+
+  const handleImportBackupFile = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const text = String(reader.result || "");
+        const result = parseUserDataBackup(text);
+        if (result && Array.isArray(result.rooms)) {
+          triggerHaptic("success");
+          savePreservedRooms(result.rooms);
+          setDraft(result.settings);
+          onSave(result.settings);
+          onReloadRooms?.(result.rooms);
+          setBackupMessage(`✅ Đã khôi phục thành công ${result.rooms.length} phòng từ file sao lưu!`);
+          setTimeout(() => setBackupMessage(null), 5000);
+        } else {
+          setError("File sao lưu không đúng định dạng An Gia Smart Home 3D.");
+        }
+      } catch {
+        setError("Lỗi khi đọc file sao lưu.");
+      }
+    };
+    reader.readAsText(file);
+  };
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -234,6 +294,51 @@ export default function SettingsModal({
               <span>
                 Khi bật tính năng này, <strong>Agent CSKH Zalo</strong> sẽ tự động quét các phòng đến kỳ tính tiền 1 tháng hoặc quá hạn để tự gửi thông báo mà không cần bấm thủ công từng phòng.
               </span>
+            </div>
+          </div>
+
+          {/* Bảo Vệ & Sao Lưu Dữ Liệu Người Dùng */}
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50/40 p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-emerald-800">
+                <ShieldCheck className="w-4 h-4 shrink-0 text-emerald-600" />
+                Bảo vệ & Sao lưu thông tin người dùng
+              </p>
+              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
+                100% An Toàn
+              </span>
+            </div>
+
+            <p className="text-xs text-slate-600">
+              Mọi đợt cập nhật tính năng mới từ GitHub sẽ <strong>tự động giữ nguyên 100% dữ liệu phòng và khách thuê</strong> trên thiết bị. Bạn cũng có thể chủ động tải file sao lưu để chuyển máy.
+            </p>
+
+            {backupMessage && (
+              <p className="rounded-lg bg-emerald-100 px-3 py-1.5 text-xs font-semibold text-emerald-800 animate-in fade-in">
+                {backupMessage}
+              </p>
+            )}
+
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <button
+                type="button"
+                onClick={handleExportBackup}
+                className="inline-flex min-h-[38px] items-center gap-1.5 rounded-xl border border-emerald-300 bg-white px-3 text-xs font-bold text-emerald-800 shadow-2xs hover:bg-emerald-50 active:scale-95 transition-all"
+              >
+                <Download className="w-3.5 h-3.5" />
+                Xuất file sao lưu (.json)
+              </button>
+
+              <label className="inline-flex min-h-[38px] items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 shadow-2xs hover:bg-slate-50 cursor-pointer active:scale-95 transition-all">
+                <Upload className="w-3.5 h-3.5 text-slate-500" />
+                <span>Nhập bản sao lưu</span>
+                <input
+                  type="file"
+                  accept=".json"
+                  className="hidden"
+                  onChange={handleImportBackupFile}
+                />
+              </label>
             </div>
           </div>
         </div>

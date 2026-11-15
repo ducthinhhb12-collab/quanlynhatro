@@ -112,17 +112,20 @@ jobs:
           path: release/AnGiaSmartHome3D.apk
           retention-days: 30
 
-      - name: Release APK to GitHub Releases
+      - name: Release APK to GitHub Releases (Rolling Update on Every Push)
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
         with:
-          name: "An Gia Smart Home 3D Native Android APK"
-          tag_name: "v1.0.0"
+          name: ${{ startsWith(github.ref, 'refs/tags/') && format('An Gia Smart Home 3D {0}', github.ref_name) || format('An Gia Smart Home 3D Mobile APK (Build #{0})', github.run_number) }}
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'app-latest' }}
           draft: false
           prerelease: false
+          make_latest: true
           files: release/AnGiaSmartHome3D.apk
           body: |
-            ## 🎉 Bản Cài Đặt Android Native Độc Lập (An Gia Smart Home 3D)
-            - **Tên tệp:** `AnGiaSmartHome3D.apk`
+            ## 🚀 Bản Cập Nhật Tự Động Cho Điện Thoại (Build #${{ github.run_number }})
+            - **Tên tệp cài đặt:** `AnGiaSmartHome3D.apk`
+            - **Commit SHA:** `${{ github.sha }}`
             - **Kiến trúc:** Capacitor 8 + React 19 + Three.js 3D (Offline-first / Zero-server)
-            - **Cách cài đặt:** Tải file `.apk` về điện thoại Android, chạm mở file và chọn **Cài đặt**.
+            - **Bảo toàn dữ liệu người dùng 100%:** Cài đè trực tiếp lên ứng dụng cũ trên máy mà không cần gỡ bỏ. Toàn bộ thông tin 12 phòng, danh bạ khách thuê, chỉ số điện nước, tài khoản ngân hàng VietQR và cấu hình Zalo được giữ nguyên vẹn tuyệt đối.
+            - **Cách cài đặt:** Tải file `AnGiaSmartHome3D.apk` về điện thoại Android, chạm mở file và chọn **Cập nhật** (hoặc Cài đặt).

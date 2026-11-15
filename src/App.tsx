@@ -55,6 +55,12 @@ import {
   buildRoomInvoiceBundle4In1,
   dispatchBundle4In1,
 } from "./utils/dispatchBundle4In1";
+import {
+  loadSafelyPreservedRooms,
+  loadSafelyPreservedSettings,
+  savePreservedRooms,
+  savePreservedSettings,
+} from "./utils/userDataGuard";
 import type {
   AgentInfo,
   AgentLog,
@@ -92,36 +98,9 @@ const getNowTimeStr = () => {
 };
 
 export default function App() {
-  // 1. Dữ liệu phòng & Settings lưu trữ bền vững
-  const [rooms, setRooms] = useState<Room[]>(() => {
-    if (typeof window === "undefined") return INITIAL_ROOMS;
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY_ROOMS);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch {
-      // ignore
-    }
-    return INITIAL_ROOMS;
-  });
-
-  const [settings, setSettings] = useState<Settings>(() => {
-    if (typeof window === "undefined") return DEFAULT_SETTINGS;
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY_SETTINGS);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed && typeof parsed === "object") {
-          return { ...DEFAULT_SETTINGS, ...parsed };
-        }
-      }
-    } catch {
-      // ignore
-    }
-    return DEFAULT_SETTINGS;
-  });
+  // 1. Dữ liệu phòng & Settings lưu trữ bền vững (Bảo toàn 100% dữ liệu người dùng qua mọi đợt cập nhật)
+  const [rooms, setRooms] = useState<Room[]>(() => loadSafelyPreservedRooms());
+  const [settings, setSettings] = useState<Settings>(() => loadSafelyPreservedSettings());
 
   // 2. Hệ thống Công ty Agent điều hành
   const [agents, setAgents] = useState<AgentInfo[]>(() => {
@@ -183,21 +162,13 @@ export default function App() {
     return () => unsub();
   }, []);
 
-  // Tự động lưu trữ localStorage
+  // Tự động lưu trữ và ghi snapshot bảo toàn 100% dữ liệu
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY_ROOMS, JSON.stringify(rooms));
-    } catch {
-      // ignore
-    }
+    savePreservedRooms(rooms);
   }, [rooms]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(settings));
-    } catch {
-      // ignore
-    }
+    savePreservedSettings(settings);
   }, [settings]);
 
   useEffect(() => {
@@ -1373,6 +1344,10 @@ export default function App() {
           settings={settings}
           onSave={handleSaveSettings}
           onResetDefault={handleResetDefault}
+          onReloadRooms={(r) => {
+            setRooms(r);
+            showToast("Đã nạp thành công dữ liệu từ bản sao lưu!", "success");
+          }}
           onClose={() => {
             setSettingsOpen(false);
             if (mobileTab === "settings") setMobileTab("3d");
