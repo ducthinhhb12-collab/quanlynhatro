@@ -1,14 +1,62 @@
 apply plugin: 'com.android.application'
 
+import java.util.Properties
+
+def getVersionCodeFromEnv() {
+    def ciBuildNumber = System.getenv("CI_BUILD_NUMBER") ?: System.getenv("GITHUB_RUN_NUMBER")
+    if (ciBuildNumber && ciBuildNumber.isInteger()) {
+        return ciBuildNumber.toInteger()
+    }
+    return 1
+}
+
+def getVersionNameFromEnv() {
+    def appVersionName = System.getenv("APP_VERSION_NAME") ?: System.getenv("GITHUB_REF_NAME")
+    if (appVersionName) {
+        return appVersionName.replace("v", "")
+    }
+    try {
+        def packageJsonFile = rootProject.file("../package.json")
+        if (packageJsonFile.exists()) {
+            def parsedJson = new groovy.json.JsonSlurper().parseText(packageJsonFile.text)
+            if (parsedJson.version) {
+                return parsedJson.version
+            }
+        }
+    } catch (Exception ignored) {}
+    return "1.0.0"
+}
+
+def keystorePropsFile = rootProject.file("keystore.properties")
+if (!keystorePropsFile.exists()) {
+    keystorePropsFile = file("keystore.properties")
+}
+def keystoreProps = new Properties()
+if (keystorePropsFile.exists()) {
+    keystoreProps.load(new FileInputStream(keystorePropsFile))
+}
+
+def ksFileName = System.getenv("KEYSTORE_FILE") ?: keystoreProps['KEYSTORE_FILE'] ?: "angia-release-key.jks"
+def ksPassword = System.getenv("KEYSTORE_PASSWORD") ?: keystoreProps['KEYSTORE_PASSWORD']
+def kAlias = System.getenv("KEY_ALIAS") ?: keystoreProps['KEY_ALIAS'] ?: "angia-key-alias"
+def kPassword = System.getenv("KEY_PASSWORD") ?: keystoreProps['KEY_PASSWORD']
+
+def resolvedKeystoreFile = file(ksFileName)
+if (!resolvedKeystoreFile.exists()) {
+    resolvedKeystoreFile = rootProject.file("app/" + ksFileName)
+}
+def hasValidKeystore = resolvedKeystoreFile.exists() && ksPassword && kPassword
+
 android {
     namespace = "com.angia.smarthome3d"
     compileSdk = rootProject.ext.compileSdkVersion
+
     defaultConfig {
         applicationId "com.angia.smarthome3d"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode getVersionCodeFromEnv()
+        versionName getVersionNameFromEnv()
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,10 +64,31 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+
+    signingConfigs {
+        release {
+            if (hasValidKeystore) {
+                storeFile resolvedKeystoreFile
+                storePassword ksPassword
+                keyAlias kAlias
+                keyPassword kPassword
+                v1SigningEnabled true
+                v2SigningEnabled true
+            }
+        }
+    }
+
     buildTypes {
         release {
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            if (hasValidKeystore) {
+                signingConfig signingConfigs.release
+            }
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+        debug {
+            signingConfig signingConfigs.debug
         }
     }
 }
