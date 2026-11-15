@@ -1,4 +1,4 @@
-﻿# scripts/build-apk-local.ps1
+# scripts/build-apk-local.ps1
 # Script tự động kiểm tra môi trường và biên dịch file .apk trực tiếp trên máy tính Windows
 
 Write-Host "==========================================================" -ForegroundColor Cyan

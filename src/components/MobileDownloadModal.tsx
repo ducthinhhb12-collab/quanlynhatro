@@ -24,7 +24,7 @@ export default function MobileDownloadModal({ onClose }: Props) {
   const [activeTab, setActiveTab] = useState<"apk" | "ios" | "github">("apk");
 
   // Đường link trực tiếp đến file APK hoặc kho phát hành GitHub Releases
-  const githubRepoUrl = "https://github.com/angiasmarthome/angia-smart-home-3d";
+  const githubRepoUrl = "https://github.com/ducthinhhb12-collab/quanlynhatro";
   const directApkUrl = `${githubRepoUrl}/releases/latest/download/AnGiaSmartHome3D.apk`;
 
   // QR Code tải trực tiếp file APK
