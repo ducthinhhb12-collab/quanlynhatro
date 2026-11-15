@@ -1,0 +1,90 @@
+{
+  "name": "an-gia-smart-home-3d",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Phần mềm quản lý nhà trọ 3D & Robot Tự Động Hóa Zalo RPA",
+  "author": "An Gia Smart Home",
+  "main": "dist-electron/main.js",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "desktop:compile": "tsc -p tsconfig.electron.json && node -e \"require('fs').writeFileSync('dist-electron/package.json', JSON.stringify({ type: 'commonjs' }))\"",
+    "desktop:dev": "concurrently -k \"cross-env BROWSER=none npm run dev\" \"wait-on http://localhost:5173 && npm run desktop:compile && electron .\"",
+    "desktop:build": "npm run desktop:compile && vite build && electron-builder --win",
+    "mobile:sync": "vite build && npx cap sync",
+    "mobile:android": "vite build && npx cap sync android && npx cap open android",
+    "mobile:ios": "vite build && npx cap sync ios && npx cap open ios",
+    "mobile:apk": "vite build && npx cap sync android && cd android && .\\gradlew.bat assembleDebug",
+    "mobile:build-apk": "powershell -ExecutionPolicy Bypass -File scripts/build-apk-local.ps1"
+  },
+  "build": {
+    "appId": "com.angia.smarthome3d",
+    "productName": "An Gia Smart Home 3D",
+    "directories": {
+      "output": "release"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "asarUnpack": [
+      "node_modules/playwright-core/**"
+    ],
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "build/**/*"
+    ]
+  },
+  "dependencies": {
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/core": "^8.6.2",
+    "@capacitor/filesystem": "^8.1.5",
+    "@capacitor/haptics": "^8.0.2",
+    "@capacitor/keyboard": "^8.0.6",
+    "@capacitor/share": "^8.0.3",
+    "@capacitor/splash-screen": "^8.0.2",
+    "@capacitor/status-bar": "^8.0.4",
+    "@react-three/drei": "^10.7.9",
+    "@react-three/fiber": "^9.8.2",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.72.0",
+    "playwright-core": "^1.65.1",
+    "qrcode": "^1.5.4",
+    "react": "19.2.6",
+    "react-dom": "19.2.6",
+    "tailwind-merge": "^3.4.0",
+    "three": "^0.187.0",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^8.6.2",
+    "@capacitor/cli": "^8.6.2",
+    "@capacitor/ios": "^8.6.2",
+    "@tailwindcss/vite": "^4.1.17",
+    "@types/node": "^22.19.17",
+    "@types/qrcode": "^1.5.6",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "@types/three": "^0.187.0",
+    "@vitejs/plugin-react": "^5.1.1",
+    "concurrently": "^10.0.7",
+    "cross-env": "^10.1.0",
+    "electron": "^45.3.2",
+    "electron-builder": "^26.18.0",
+    "tailwindcss": "^4.1.17",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.7",
+    "wait-on": "^9.5.1"
+  }
+}

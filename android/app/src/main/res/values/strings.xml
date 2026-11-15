@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">An Gia Smart Home 3D</string>
+    <string name="title_activity_main">An Gia Smart Home 3D</string>
+    <string name="package_name">com.angia.smarthome3d</string>
+    <string name="custom_url_scheme">com.angia.smarthome3d</string>
+</resources>
