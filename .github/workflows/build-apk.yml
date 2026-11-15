@@ -64,6 +64,16 @@ jobs:
           cd android
           ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 | tee ../gradle_build.log
 
+      - name: Report Build Diagnostics as GitHub Annotation
+        if: always()
+        run: |
+          if [ -f gradle_build.log ]; then
+            FAIL_LINE=$(grep -E "(FAILURE|BUILD FAILED|Exception:)" gradle_build.log | tail -n 1)
+            DETAIL_LINES=$(tail -n 25 gradle_build.log | tr '\n' ' ' | head -c 1000)
+            echo "::error title=GradleFailure::$FAIL_LINE"
+            echo "::warning title=GradleLogTail::$DETAIL_LINES"
+          fi
+
       - name: Publish Gradle Build Log to Step Summary
         if: always()
         run: |
@@ -75,17 +85,6 @@ jobs:
             echo "No gradle_build.log found." >> $GITHUB_STEP_SUMMARY
           fi
           echo '```' >> $GITHUB_STEP_SUMMARY
-
-      - name: Save Debug Log to Branch
-        if: always()
-        run: |
-          git config user.name "github-actions"
-          git config user.email "github-actions@github.com"
-          git checkout -B build-debug-log
-          cp gradle_build.log debug.log 2>/dev/null || echo "No gradle_build.log" > debug.log
-          git add debug.log
-          git commit -m "chore(debug): add build log" || true
-          git push -f https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git build-debug-log || true
 
       - name: Upload Build Log Artifact
         if: always()
