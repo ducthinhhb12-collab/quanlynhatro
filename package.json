@@ -19,7 +19,14 @@
     "mobile:apk": "vite build && npx cap sync android && cd android && .\\gradlew.bat assembleDebug",
     "mobile:release": "vite build && npx cap sync android && cd android && .\\gradlew.bat assembleRelease bundleRelease",
     "mobile:keystore": "powershell -ExecutionPolicy Bypass -File scripts/generate-keystore.ps1",
-    "mobile:build-apk": "powershell -ExecutionPolicy Bypass -File scripts/build-apk-local.ps1"
+    "mobile:build-apk": "powershell -ExecutionPolicy Bypass -File scripts/build-apk-local.ps1",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build",
+    "tauri:android:init": "tauri android init",
+    "tauri:android:build": "tauri android build",
+    "tauri:ios:init": "tauri ios init",
+    "tauri:ios:build": "tauri ios build"
   },
   "build": {
     "appId": "com.angia.smarthome3d",
@@ -59,6 +66,9 @@
     "@capacitor/status-bar": "^8.0.4",
     "@react-three/drei": "^10.7.9",
     "@react-three/fiber": "^9.8.2",
+    "@tauri-apps/api": "^2.12.4",
+    "@tauri-apps/plugin-fs": "^2.7.1",
+    "@tauri-apps/plugin-notification": "^2.8.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.72.0",
     "playwright-core": "^1.65.1",
@@ -74,6 +84,7 @@
     "@capacitor/cli": "^8.6.2",
     "@capacitor/ios": "^8.6.2",
     "@tailwindcss/vite": "^4.1.17",
+    "@tauri-apps/cli": "^2.12.4",
     "@types/node": "^22.19.17",
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19.2.7",

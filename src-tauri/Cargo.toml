@@ -1,0 +1,25 @@
+[package]
+name = "an-gia-smart-home-3d"
+version = "1.0.0"
+description = "An Gia Smart Home 3D Native Engine"
+authors = ["An Gia Smart Home"]
+edition = "2024"
+
+[lib]
+name = "an_gia_smart_home_3d_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.7.4" }
+
+[dependencies]
+tauri = { version = "2.12.5" }
+tauri-plugin-fs = "2"
+tauri-plugin-notification = "2"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "default-tls"] }
+rust_xlsxwriter = "0.80"
+chrono = { version = "0.4", features = ["serde"] }
+urlencoding = "2.1"

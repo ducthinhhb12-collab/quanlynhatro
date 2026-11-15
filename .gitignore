@@ -43,6 +43,12 @@ ios/App/build/
 ios/App/Pods/
 ios/App/.symlinks/
 
+# Rust & Tauri build outputs
+src-tauri/target/
+target/
+src-tauri/cargo_stdout.txt
+src-tauri/cargo_stderr.txt
+
 # Android Keystore & Signing Secrets (CRITICAL SECURITY - NEVER COMMIT)
 *.jks
 *.keystore
