@@ -1,15 +1,18 @@
-name: Build iOS Native Package
+name: Build & Package iOS Native IPA
 
 on:
   workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
 
 permissions:
   contents: write
 
 jobs:
-  build-ios:
-    name: Build Standalone iOS App
-    runs-on: macos-latest
+  build-ipa:
+    name: Compile iOS Native (.IPA) on macOS Runner
+    runs-on: macos-14
 
     steps:
       - name: Checkout Source Code
@@ -29,13 +32,58 @@ jobs:
         run: |
           npm run build
 
-      - name: Archive iOS Source
+      - name: Sync Capacitor iOS
         run: |
-          tar -czf release-ios-app.tar.gz ios/
+          npx cap sync ios
 
-      - name: Upload iOS Project Artifact
+      - name: Select Xcode Version
+        run: |
+          if [ -d "/Applications/Xcode_15.4.app" ]; then
+            sudo xcode-select -s /Applications/Xcode_15.4.app/Contents/Developer
+          else
+            sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+          fi
+          xcodebuild -version
+
+      - name: Compile and Archive iOS Application
+        run: |
+          mkdir -p build
+          xcodebuild archive \
+            -project ios/App/App.xcodeproj \
+            -scheme App \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath build/App.xcarchive \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES
+
+      - name: Package .IPA Binary
+        run: |
+          mkdir -p build/Payload
+          cp -r build/App.xcarchive/Products/Applications/App.app build/Payload/
+          cd build
+          zip -r -q ../AnGiaSmartHome3D.ipa Payload
+          cd ..
+          shasum -a 256 AnGiaSmartHome3D.ipa > AnGiaSmartHome3D.ipa.sha256
+          ls -lh AnGiaSmartHome3D.ipa
+
+      - name: Upload iOS IPA Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: AnGiaSmartHome3D-iOS
-          path: release-ios-app.tar.gz
+          name: AnGiaSmartHome3D-IPA
+          path: |
+            AnGiaSmartHome3D.ipa
+            AnGiaSmartHome3D.ipa.sha256
           retention-days: 30
+
+      - name: Release IPA to GitHub Releases (if Tagged)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            AnGiaSmartHome3D.ipa
+            AnGiaSmartHome3D.ipa.sha256
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
