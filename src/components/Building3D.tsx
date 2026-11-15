@@ -30,6 +30,7 @@ interface BlockProps {
   dimmed: boolean;
   onHover: (id: string | null) => void;
   onSelect: (id: string) => void;
+  portalRef?: React.RefObject<HTMLDivElement | null>;
 }
 
 function RoomBlock({
@@ -42,6 +43,7 @@ function RoomBlock({
   dimmed,
   onHover,
   onSelect,
+  portalRef,
 }: BlockProps) {
   const x = (room.col - centerCol) * COL_STEP;
   const y = (room.floor - 1) * FLOOR_STEP;
@@ -104,7 +106,7 @@ function RoomBlock({
         </mesh>
 
         {/* Nhãn phòng dạng 3D HTML Badge */}
-        <Html position={[0, ROOM_H * 0.55, ROOM_D / 2 + 0.02]} center transform sprite>
+        <Html position={[0, ROOM_H * 0.55, ROOM_D / 2 + 0.02]} center transform sprite portal={portalRef}>
           <div
             onClick={(e) => {
               e.stopPropagation();
@@ -138,6 +140,7 @@ interface SceneProps {
   filterStatus: RoomStatus | null;
   onSelect: (id: string) => void;
   isMobile?: boolean;
+  portalRef?: React.RefObject<HTMLDivElement | null>;
 }
 
 function BuildingScene({
@@ -149,6 +152,7 @@ function BuildingScene({
   filterStatus,
   onSelect,
   isMobile = false,
+  portalRef,
 }: SceneProps) {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
 
@@ -205,7 +209,7 @@ function BuildingScene({
           const labelX = -(slabW / 2 + 1.35);
           const labelY = (floorNum - 1) * FLOOR_STEP + 0.55;
           return (
-            <Html key={`floor-lbl-${floorNum}`} position={[labelX, labelY, 0]} center>
+            <Html key={`floor-lbl-${floorNum}`} position={[labelX, labelY, 0]} center portal={portalRef}>
               <div
                 className={cn(
                   "pointer-events-none whitespace-nowrap text-[10px] font-extrabold tracking-[0.2em] transition-colors",
@@ -236,6 +240,7 @@ function BuildingScene({
               dimmed={dimmed}
               onHover={setHoveredId}
               onSelect={onSelect}
+              portalRef={portalRef}
             />
           );
         })}
@@ -281,6 +286,7 @@ export default function Building3D({
   isLocked = false,
   ...sceneProps
 }: Props) {
+  const containerRef = useRef<HTMLDivElement>(null);
   const [isMobile, setIsMobile] = useState<boolean>(false);
 
   useEffect(() => {
@@ -298,7 +304,7 @@ export default function Building3D({
   }, [rooms]);
 
   return (
-    <div className={cn("relative h-full w-full", isLocked && "pointer-events-none")}>
+    <div ref={containerRef} className={cn("relative h-full w-full", isLocked && "pointer-events-none")}>
       {/* Thanh chọn nhanh tầng ở góc trên bên phải vùng 3D */}
       <div className="pointer-events-auto absolute right-3 md:right-5 top-3 md:top-5 z-20 flex items-center gap-1 rounded-2xl border border-slate-200/90 bg-white/95 p-1 shadow-md backdrop-blur">
         <span className="flex items-center gap-1 pl-2 pr-1 text-xs font-semibold text-slate-500">
@@ -354,6 +360,7 @@ export default function Building3D({
           rooms={rooms}
           selectedFloor={selectedFloor}
           isMobile={isMobile}
+          portalRef={containerRef}
           {...sceneProps}
         />
       </Canvas>

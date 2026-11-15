@@ -229,7 +229,7 @@ export default function RoomDrawer({
   const total = shown ? roomTotal(shown, settings) : 0;
   const isPaid = shown?.status === "PAID";
   const dueInfo = shown ? getDueStatusInfo(shown.dueDate) : null;
-  const qrUrl = shown ? buildVietQrUrl(shown, settings) : "";
+  const displayQr = offlineQr;
   const composedMessage = shown ? buildReminderMessage(shown, settings) : "";
 
   useEffect(() => {
@@ -741,16 +741,17 @@ export default function RoomDrawer({
                   </div>
 
                   <div className="mt-3 flex items-center gap-3 bg-white p-2.5 rounded-xl border border-indigo-100 shadow-2xs">
-                    <img
-                      src={qrUrl}
-                      onError={(e) => {
-                        if (offlineQr) {
-                          (e.target as HTMLImageElement).src = offlineQr;
-                        }
-                      }}
-                      alt={`VietQR ${shown.id}`}
-                      className="h-16 w-16 shrink-0 rounded-lg border border-slate-200 object-contain bg-white"
-                    />
+                    {displayQr ? (
+                      <img
+                        src={displayQr}
+                        alt={`VietQR ${shown.id}`}
+                        className="h-16 w-16 shrink-0 rounded-lg border border-slate-200 object-contain bg-white"
+                      />
+                    ) : (
+                      <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-100 text-slate-400">
+                        <QrCode className="w-8 h-8 opacity-40 animate-pulse" />
+                      </div>
+                    )}
                     <div className="min-w-0 flex-1 text-xs">
                       <p className="font-bold text-slate-900 truncate">Mã VietQR động: {formatVND(total)}</p>
                       <p className="text-[11px] text-slate-500 truncate">{settings.bankName} • {settings.accountNumber}</p>

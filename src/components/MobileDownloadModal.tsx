@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Smartphone,
   QrCode,
@@ -13,7 +13,7 @@ import {
   Terminal,
   Zap,
 } from "lucide-react";
-import { triggerHaptic } from "../utils/platformBridge";
+import { triggerHaptic, generateQrDataUrlLocal } from "../utils/platformBridge";
 
 interface Props {
   onClose: () => void;
@@ -22,13 +22,21 @@ interface Props {
 export default function MobileDownloadModal({ onClose }: Props) {
   const [copied, setCopied] = useState(false);
   const [activeTab, setActiveTab] = useState<"apk" | "ios" | "github">("apk");
+  const [localQrUrl, setLocalQrUrl] = useState<string>("");
 
-  // Đường link trực tiếp đến file APK hoặc kho phát hành GitHub Releases
+  // Đường link trực tiếp đến file APK Signed Release trên GitHub Releases
   const githubRepoUrl = "https://github.com/ducthinhhb12-collab/quanlynhatro";
-  const directApkUrl = `${githubRepoUrl}/releases/latest/download/AnGiaSmartHome3D.apk`;
+  const directApkUrl = `${githubRepoUrl}/releases/download/v1.0.1/AnGiaSmartHome3D-release.apk`;
+  const releasesPageUrl = `${githubRepoUrl}/releases/latest`;
 
-  // QR Code tải trực tiếp file APK
-  const qrDownloadUrl = `https://api.qrserver.com/v1/create-qr-code/?size=280x280&margin=10&data=${encodeURIComponent(
+  // QR Code tải trực tiếp file APK tạo cục bộ (100% offline không cần API bên ngoài)
+  useEffect(() => {
+    generateQrDataUrlLocal(directApkUrl).then((url) => {
+      if (url) setLocalQrUrl(url);
+    });
+  }, [directApkUrl]);
+
+  const qrDownloadUrl = localQrUrl || `https://api.qrserver.com/v1/create-qr-code/?size=280x280&margin=10&data=${encodeURIComponent(
     directApkUrl
   )}`;
 
@@ -141,22 +149,22 @@ export default function MobileDownloadModal({ onClose }: Props) {
                   <span>Bản dựng Native Standalone 100%</span>
                 </div>
                 <h3 className="text-sm font-bold text-slate-900">
-                  AnGiaSmartHome3D.apk (v1.0.0)
+                  AnGiaSmartHome3D-release.apk (v1.0.1)
                 </h3>
                 <p className="text-[11px] text-slate-500 leading-relaxed">
-                  Quét mã QR bằng Camera điện thoại hoặc bấm nút bên dưới để tải trực tiếp file cài đặt APK về máy.
+                  Bản phát hành chính thức đã ký số Keystore RSA-4096 production. Quét mã QR bằng Camera điện thoại hoặc bấm nút bên dưới để tải trực tiếp file cài đặt APK về máy.
                 </p>
 
                 <div className="pt-1 flex flex-wrap gap-2">
                   <a
                     href={directApkUrl}
-                    download="AnGiaSmartHome3D.apk"
+                    download="AnGiaSmartHome3D-release.apk"
                     target="_blank"
                     rel="noreferrer"
                     className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-sm shadow-emerald-200 hover:bg-emerald-700 active:scale-95 transition-all"
                   >
                     <Download className="w-3.5 h-3.5" />
-                    <span>Tải File .APK Về Máy</span>
+                    <span>Tải Bản Ký Số .APK</span>
                   </a>
 
                   <button

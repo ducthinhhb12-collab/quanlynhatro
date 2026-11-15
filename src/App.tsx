@@ -15,6 +15,7 @@ import CustomerManagerModal from "./components/CustomerManagerModal";
 import MobileDownloadModal from "./components/MobileDownloadModal";
 import BottomNavBar, { type MobileTab } from "./components/BottomNavBar";
 import Toast from "./components/Toast";
+import { cn } from "./utils/cn";
 import {
   DEFAULT_SETTINGS,
   INITIAL_AGENTS,
@@ -931,8 +932,10 @@ export default function App() {
       <main className="relative flex-1 w-full overflow-hidden bg-slate-50 mt-[64px] md:mt-[72px] pb-[calc(64px+env(safe-area-inset-bottom,0px))] md:pb-0">
         {/* 3D Canvas */}
         <div
-          className="absolute inset-y-0 left-0 transition-[right] duration-300 ease-out"
-          style={{ right: selectedRoom ? DRAWER_WIDTH : 0 }}
+          className={cn(
+            "absolute inset-y-0 left-0 right-0 transition-[right] duration-300 ease-out",
+            selectedRoom && "md:right-[410px]"
+          )}
         >
           <Building3D
             rooms={rooms}
