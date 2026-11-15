@@ -1,4 +1,4 @@
-﻿# ==============================================================================
+# ==============================================================================
 # Script: generate-keystore.ps1
 # Mục đích: Tự động sinh khóa bảo mật số Android Keystore (RSA 4096-bit, 27 năm),
 #           mã hóa chuỗi Base64 cho GitHub Secrets và trích xuất mã SHA-256 cho Firebase
