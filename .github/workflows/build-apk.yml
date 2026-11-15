@@ -68,10 +68,10 @@ jobs:
         if: always()
         run: |
           if [ -f gradle_build.log ]; then
-            FAIL_LINE=$(grep -E "(FAILURE|BUILD FAILED|Exception:)" gradle_build.log | tail -n 1)
-            DETAIL_LINES=$(tail -n 25 gradle_build.log | tr '\n' ' ' | head -c 1000)
-            echo "::error title=GradleFailure::$FAIL_LINE"
-            echo "::warning title=GradleLogTail::$DETAIL_LINES"
+            WHAT_FAILED=$(grep -A 8 "* What went wrong:" gradle_build.log | tr '\n' ' ' | head -c 1000)
+            echo "::error title=WhatWentWrong::$WHAT_FAILED"
+            CAUSED_BY=$(grep -A 4 "Caused by:" gradle_build.log | head -n 12 | tr '\n' ' ' | head -c 1000)
+            echo "::warning title=GradleCausedBy::$CAUSED_BY"
           fi
 
       - name: Publish Gradle Build Log to Step Summary
