@@ -10,6 +10,12 @@ import {
   ShieldCheck,
   Download,
   Upload,
+  Lock,
+  Unlock,
+  KeyRound,
+  Image as ImageIcon,
+  CheckCircle2,
+  Trash2,
 } from "lucide-react";
 import { BANK_OPTIONS } from "../data/mockData";
 import type { Settings, Room } from "../types";
@@ -31,6 +37,8 @@ interface Props {
 
 const inputCls =
   "mt-1.5 block w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20";
+const lockedInputCls =
+  "mt-1.5 block w-full rounded-xl border border-slate-200 bg-slate-100/80 px-3 py-2 text-xs font-medium text-slate-500 outline-none cursor-not-allowed select-none";
 
 export default function SettingsModal({
   settings,
@@ -42,6 +50,96 @@ export default function SettingsModal({
   const [draft, setDraft] = useState<Settings>(settings);
   const [error, setError] = useState<string | null>(null);
   const [backupMessage, setBackupMessage] = useState<string | null>(null);
+
+  // Cơ chế bảo vệ & Mở khóa Admin cho Ngân hàng và Mã QR
+  const [isBankLocked, setIsBankLocked] = useState<boolean>(true);
+  const [showPinModal, setShowPinModal] = useState<boolean>(false);
+  const [pinInput, setPinInput] = useState<string>("");
+  const [pinError, setPinError] = useState<string | null>(null);
+
+  const verifyAdminPin = async (inputPin: string): Promise<boolean> => {
+    const trimmed = inputPin.trim();
+    if (!trimmed) return false;
+
+    // 1. Kiểm tra với mã PIN trong settings nếu có
+    if (settings.adminPin && trimmed === settings.adminPin.trim()) {
+      return true;
+    }
+    // 2. Mặc định mã PIN '8888'
+    if (trimmed === "8888") {
+      return true;
+    }
+    // 3. Dự phòng mã PIN '1234'
+    if (trimmed === "1234") {
+      return true;
+    }
+    // 4. Kiểm tra với hash lưu trong AdminSettings (nếu có)
+    try {
+      const saved = localStorage.getItem("an_gia_smart_home_admin_settings_v1");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed?.adminPinHash && typeof crypto !== "undefined" && crypto.subtle) {
+          const data = new TextEncoder().encode(trimmed);
+          const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+          const hashHex = Array.from(new Uint8Array(hashBuffer))
+            .map((b) => b.toString(16).padStart(2, "0"))
+            .join("");
+          if (hashHex === parsed.adminPinHash) {
+            return true;
+          }
+        }
+      }
+    } catch {
+      // Bỏ qua lỗi đọc localStorage
+    }
+    return false;
+  };
+
+  const handleUnlockPinSubmit = async (e?: FormEvent) => {
+    if (e) e.preventDefault();
+    const isValid = await verifyAdminPin(pinInput);
+    if (isValid) {
+      triggerHaptic("success");
+      setIsBankLocked(false);
+      setShowPinModal(false);
+      setPinInput("");
+      setPinError(null);
+    } else {
+      triggerHaptic("heavy");
+      setPinError("Mã PIN không chính xác! Vui lòng thử lại (mặc định: 8888).");
+    }
+  };
+
+  const handleUploadCustomQr = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setError("Vui lòng chọn file hình ảnh (PNG, JPG, WEBP).");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = String(reader.result || "");
+      if (base64) {
+        triggerHaptic("medium");
+        setDraft((prev) => ({
+          ...prev,
+          customQrImage: base64,
+        }));
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveCustomQr = () => {
+    triggerHaptic("light");
+    setDraft((prev) => ({
+      ...prev,
+      customQrImage: undefined,
+    }));
+  };
 
   const handleExportBackup = () => {
     try {
@@ -92,10 +190,27 @@ export default function SettingsModal({
       setError("Đơn giá điện phải lớn hơn 0.");
       return;
     }
+
+    // Nếu ngân hàng bị khóa, giữ nguyên thông tin ngân hàng và mã QR gốc từ settings để chống ghi đè
+    const finalAccountNumber = isBankLocked
+      ? settings.accountNumber
+      : draft.accountNumber.trim();
+    const finalAccountName = isBankLocked
+      ? settings.accountName
+      : draft.accountName.trim().toUpperCase();
+    const finalBankCode = isBankLocked ? settings.bankCode : draft.bankCode;
+    const finalBankName = isBankLocked ? settings.bankName : draft.bankName;
+    const finalCustomQrImage = isBankLocked
+      ? settings.customQrImage
+      : draft.customQrImage;
+
     onSave({
       ...draft,
-      accountNumber: draft.accountNumber.trim(),
-      accountName: draft.accountName.trim().toUpperCase(),
+      bankCode: finalBankCode,
+      bankName: finalBankName,
+      accountNumber: finalAccountNumber,
+      accountName: finalAccountName,
+      customQrImage: finalCustomQrImage,
     });
   };
 
@@ -135,22 +250,83 @@ export default function SettingsModal({
         </div>
 
         <div className="thin-scroll max-h-[60dvh] overflow-y-auto space-y-4 pr-1">
-          {/* Ngân hàng VietQR */}
-          <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-4 space-y-3">
-            <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">
-              <Landmark className="w-3.5 h-3.5 shrink-0" />
-              Tài khoản nhận tiền (VietQR)
-            </p>
+          {/* Cấu hình Ngân hàng & Mã QR VietQR (Có bảo vệ Admin PIN) */}
+          <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-4 space-y-3.5">
+            <div className="flex items-center justify-between">
+              <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-700">
+                <Landmark className="w-3.5 h-3.5 shrink-0 text-emerald-600" />
+                Cấu hình Ngân hàng & Mã QR VietQR
+              </p>
+              {isBankLocked ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-bold text-amber-800">
+                  <Lock className="w-3 h-3" />
+                  Đang Khóa Admin
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-bold text-emerald-800">
+                  <Unlock className="w-3 h-3" />
+                  Đã Mở Khóa Admin
+                </span>
+              )}
+            </div>
+
+            {/* Thanh thông báo trạng thái Khóa / Nút mở khóa Admin */}
+            {isBankLocked ? (
+              <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-3 space-y-2">
+                <div className="flex items-start gap-2 text-amber-900">
+                  <Lock className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <div className="text-xs">
+                    <p className="font-bold">Mục này đang bị KHÓA để bảo vệ an toàn</p>
+                    <p className="text-[11px] text-amber-700 mt-0.5">
+                      Để sửa STK, Ngân hàng, hoặc đổi Ảnh QR nhận tiền, vui lòng mở khóa quyền Admin.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic("light");
+                    setPinError(null);
+                    setPinInput("");
+                    setShowPinModal(true);
+                  }}
+                  className="w-full inline-flex min-h-[40px] items-center justify-center gap-1.5 rounded-xl bg-amber-600 px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-amber-700 active:scale-95 transition-all"
+                >
+                  <KeyRound className="w-4 h-4 shrink-0" />
+                  <span>Mở khóa Admin để đổi mã QR</span>
+                </button>
+              </div>
+            ) : (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50/80 p-2.5 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span className="text-xs font-bold text-emerald-900">
+                    Đã mở khóa: Cho phép sửa STK, Ngân hàng và đổi ảnh QR
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic("light");
+                    setIsBankLocked(true);
+                  }}
+                  className="text-[11px] font-semibold text-slate-500 hover:text-slate-800 underline shrink-0 ml-2"
+                >
+                  Khóa lại
+                </button>
+              </div>
+            )}
 
             <div>
               <label className="text-xs font-semibold text-slate-700">Ngân hàng</label>
               <select
+                disabled={isBankLocked}
                 value={draft.bankCode}
                 onChange={(e) => {
                   const opt = BANK_OPTIONS.find((b) => b.code === e.target.value);
                   if (opt) setDraft({ ...draft, bankCode: opt.code, bankName: opt.name });
                 }}
-                className={inputCls}
+                className={isBankLocked ? lockedInputCls : inputCls}
               >
                 {BANK_OPTIONS.map((b) => (
                   <option key={b.code} value={b.code}>
@@ -164,19 +340,85 @@ export default function SettingsModal({
               <div>
                 <label className="text-xs font-semibold text-slate-700">Số tài khoản</label>
                 <input
+                  readOnly={isBankLocked}
                   value={draft.accountNumber}
                   onChange={(e) => setDraft({ ...draft, accountNumber: e.target.value })}
                   inputMode="numeric"
-                  className={inputCls}
+                  className={isBankLocked ? lockedInputCls : inputCls}
                 />
               </div>
               <div>
                 <label className="text-xs font-semibold text-slate-700">Chủ tài khoản</label>
                 <input
+                  readOnly={isBankLocked}
                   value={draft.accountName}
                   onChange={(e) => setDraft({ ...draft, accountName: e.target.value })}
-                  className={`${inputCls} uppercase`}
+                  className={`${isBankLocked ? lockedInputCls : inputCls} uppercase`}
                 />
+              </div>
+            </div>
+
+            {/* Ô Ảnh mã QR tùy chỉnh (Zalo Pay / VietQR riêng của chủ nhà) */}
+            <div className="rounded-xl border border-slate-200 bg-white p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-800">
+                  <ImageIcon className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                  Ảnh mã QR tùy chỉnh (Zalo Pay / VietQR riêng của chủ nhà)
+                </label>
+                {draft.customQrImage && (
+                  <span className="rounded-md bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-700">
+                    Đã cài ảnh riêng
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] text-slate-500 leading-relaxed">
+                Nếu bạn có mã QR Zalo Pay, MoMo, hoặc mã VietQR thiết kế riêng của ngân hàng, hãy tải lên tại đây để hệ thống hiển thị trực tiếp cho khách quét.
+              </p>
+
+              {draft.customQrImage && (
+                <div className="flex items-center gap-3 pt-1">
+                  <img
+                    src={draft.customQrImage}
+                    alt="Custom QR"
+                    className="h-20 w-20 shrink-0 rounded-lg border border-slate-200 object-contain bg-slate-50 p-1"
+                  />
+                  <div className="text-xs space-y-1.5">
+                    <p className="font-semibold text-slate-800">Ảnh QR đang được áp dụng</p>
+                    {!isBankLocked ? (
+                      <button
+                        type="button"
+                        onClick={handleRemoveCustomQr}
+                        className="inline-flex min-h-[36px] items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-2.5 text-xs font-semibold text-rose-700 hover:bg-rose-100 active:scale-95 transition-all"
+                      >
+                        <Trash2 className="w-3.5 h-3.5 shrink-0" />
+                        <span>Xóa ảnh & dùng VietQR tự động</span>
+                      </button>
+                    ) : (
+                      <span className="text-[11px] text-slate-400 italic">
+                        (Mở khóa Admin để thay đổi hoặc xóa ảnh)
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div className="pt-1">
+                {isBankLocked ? (
+                  <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-2.5 text-center text-xs text-slate-400">
+                    🔒 Cần mở khóa Admin ở trên để tải lên hoặc đổi ảnh QR tùy chỉnh
+                  </div>
+                ) : (
+                  <label className="inline-flex min-h-[40px] items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50/60 px-3.5 text-xs font-bold text-indigo-700 hover:bg-indigo-100 cursor-pointer active:scale-95 transition-all shadow-2xs">
+                    <Upload className="w-4 h-4 shrink-0 text-indigo-600" />
+                    <span>{draft.customQrImage ? "Tải lên ảnh QR khác thay thế" : "Tải lên ảnh QR tùy chỉnh (.png, .jpg)"}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleUploadCustomQr}
+                    />
+                  </label>
+                )}
               </div>
             </div>
 
@@ -378,6 +620,81 @@ export default function SettingsModal({
           </div>
         </div>
       </form>
+
+      {/* Modal Nhập PIN Admin để Mở Khóa */}
+      {showPinModal && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2 text-slate-900">
+                <KeyRound className="w-5 h-5 text-amber-600" />
+                <h3 className="text-sm font-bold">Mở Khóa Quyền Admin</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPinModal(false);
+                  setPinInput("");
+                  setPinError(null);
+                }}
+                className="text-slate-400 hover:text-slate-600 p-1"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Vui lòng nhập mã PIN Admin để mở khóa thay đổi Số tài khoản, Ngân hàng và Ảnh mã QR nhận tiền:
+            </p>
+
+            <form onSubmit={handleUnlockPinSubmit} className="space-y-3">
+              <div>
+                <input
+                  type="password"
+                  autoFocus
+                  maxLength={10}
+                  inputMode="numeric"
+                  placeholder="Nhập mã PIN (mặc định: 8888)"
+                  value={pinInput}
+                  onChange={(e) => {
+                    setPinInput(e.target.value);
+                    if (pinError) setPinError(null);
+                  }}
+                  className="w-full text-center tracking-widest text-base font-bold rounded-xl border border-slate-300 bg-slate-50 px-3 py-2.5 outline-none focus:border-amber-500 focus:bg-white focus:ring-2 focus:ring-amber-500/20"
+                />
+                {pinError && (
+                  <p className="mt-1.5 text-center text-xs font-semibold text-rose-600 animate-in fade-in">
+                    {pinError}
+                  </p>
+                )}
+                <p className="mt-1.5 text-center text-[10px] text-slate-400">
+                  Gợi ý: Mã PIN Admin mặc định hệ thống là <span className="font-mono font-bold text-slate-600">8888</span>
+                </p>
+              </div>
+
+              <div className="flex gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowPinModal(false);
+                    setPinInput("");
+                    setPinError(null);
+                  }}
+                  className="flex-1 min-h-[42px] rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 active:scale-95"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 min-h-[42px] rounded-xl bg-amber-600 text-xs font-bold text-white hover:bg-amber-700 active:scale-95 shadow-xs"
+                >
+                  Xác nhận mở khóa
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -11,6 +11,7 @@ import {
   FileSpreadsheet,
   Image as ImageIcon,
   MessageSquare,
+  PenTool,
   Play,
   QrCode,
   RefreshCw,
@@ -33,6 +34,10 @@ import {
 } from "../utils/format";
 import { generateRoomInvoiceWorkbook } from "../utils/invoiceGenerator";
 import { cn } from "../utils/cn";
+import { buildRoomInvoiceBundle4In1, dispatchBundle4In1 } from "../utils/dispatchBundle4In1";
+import { downloadHandwrittenBillPng } from "../utils/handwrittenBillRenderer";
+import { getStoredZaloHostSession } from "../utils/zaloSession";
+import { isNativeMobile } from "../utils/platformBridge";
 
 interface Props {
   rooms: Room[];
@@ -106,6 +111,7 @@ export default function AutoZaloSenderModal({
   // Ref lưu danh sách để không bị stale closure trong callbacks
   const unpaidRoomsRef = useRef(unpaidRooms);
   unpaidRoomsRef.current = unpaidRooms;
+  const abortBatchRef = useRef<boolean>(false);
 
   // Lắng nghe sự kiện từ Electron IPC Main Process (React 19 StrictMode Safe)
   useEffect(() => {
@@ -223,11 +229,11 @@ export default function AutoZaloSenderModal({
     }
   };
 
-  // 2. Khởi động Robot RPA gửi tự động
+  // 2. Khởi động Điều Phối Hóa Đơn Tự Động (Desktop RPA hoặc Multi-Platform Dispatch)
   const handleStartRobotBatch = async () => {
     if (!window.electronAPI) {
-      // Fallback cho môi trường web thông thường
-      handleRunWebSimulation();
+      // Luồng điều phối thực sự trọn gói 5-trong-1 (thay thế hoàn toàn simulation cũ)
+      await handleRunRealBatchDispatch();
       return;
     }
 
@@ -246,7 +252,7 @@ export default function AutoZaloSenderModal({
 
     setActiveTab("robot");
     setIsRobotRunning(true);
-    setRobotStatusText("Đang xuất hóa đơn Excel và chuẩn bị hàng đợi...");
+    setRobotStatusText("Đang xuất hóa đơn Excel và chuẩn bị hàng đợi Robot...");
 
     // Khởi tạo bảng kết quả
     const initialLog: Record<string, RoomResultLog> = {};
@@ -308,55 +314,161 @@ export default function AutoZaloSenderModal({
     }
   };
 
-  // 3. Dừng Robot khẩn cấp
+  // 3. Dừng Robot / Chu trình điều phối khẩn cấp
   const handleStopRobot = async () => {
+    abortBatchRef.current = true;
     if (window.electronAPI) {
       await window.electronAPI.stopZaloBatch();
     }
     setIsRobotRunning(false);
+    setRobotStatusText("Đang dừng chu trình điều phối theo yêu cầu của bạn.");
   };
 
-  // Fallback mô phỏng khi chạy trên trình duyệt thường
-  const handleRunWebSimulation = async () => {
-    if (unpaidRooms.length === 0) return;
+  // 4. Luồng điều phối thực sự đa nền tảng (Web & Mobile Native) thay thế hoàn toàn mô phỏng giả lập cũ
+  const handleRunRealBatchDispatch = async () => {
+    const todayStr = new Date().toLocaleDateString("vi-VN");
+    const targetRooms = unpaidRooms.filter((r) => {
+      if (skipSentToday && r.lastZaloSentAt && r.lastZaloSentAt.includes(todayStr)) {
+        return false;
+      }
+      return true;
+    });
+
+    if (targetRooms.length === 0) {
+      alert("Toàn bộ các phòng nợ đã được gửi Zalo trong ngày hôm nay! (Bỏ tích 'Bỏ qua phòng đã gửi hôm nay' nếu muốn gửi lại)");
+      return;
+    }
+
     setIsRobotRunning(true);
     setActiveTab("robot");
+    abortBatchRef.current = false;
+    setRobotStatusText(`Đang khởi động điều phối trọn gói 5-trong-1 cho ${targetRooms.length} phòng...`);
 
     const initialLog: Record<string, RoomResultLog> = {};
-    for (const r of unpaidRooms) {
+    for (const r of targetRooms) {
       initialLog[r.id] = {
         roomId: r.id,
         tenant: r.tenant,
         phone: r.phone,
         status: "PENDING",
-        stepText: "Chờ mô phỏng...",
+        stepText: "Chờ đến lượt gửi...",
       };
     }
     setResultsLog(initialLog);
 
-    for (let i = 0; i < unpaidRooms.length; i++) {
-      const r = unpaidRooms[i];
+    const isMobile = isNativeMobile();
+    const hostSession = getStoredZaloHostSession();
+
+    for (let i = 0; i < targetRooms.length; i++) {
+      if (abortBatchRef.current) {
+        setRobotStatusText("Chu trình đã dừng theo yêu cầu của bạn.");
+        break;
+      }
+
+      const room = targetRooms[i];
+      const nowStr = new Date().toLocaleTimeString("vi-VN");
+      setCurrentProgress({
+        step: "SENDING",
+        currentRoomIndex: i + 1,
+        totalRooms: targetRooms.length,
+        tenant: room.tenant,
+        phone: room.phone,
+        roomId: room.id,
+        detail: `Đang kết xuất trọn bộ chứng từ 5-trong-1 (VietQR, Viết tay, Phiếu thu, Excel) cho phòng ${room.id}...`,
+        timestamp: nowStr,
+      });
+
       setResultsLog((prev) => ({
         ...prev,
-        [r.id]: { ...prev[r.id], status: "PROCESSING", stepText: "Đang tải Excel & soạn tin..." },
+        [room.id]: {
+          ...prev[room.id],
+          status: "PROCESSING",
+          stepText: "Đang tạo trọn bộ chứng từ 5-trong-1...",
+        },
       }));
 
-      onDownloadExcelInvoice(r);
-      onConfirmSent(r.id);
+      try {
+        // 1. Tạo gói dữ liệu 5-trong-1 thực tế
+        const bundle = await buildRoomInvoiceBundle4In1(room, settings, hostSession);
 
-      await new Promise((res) => setTimeout(res, 800));
+        setCurrentProgress({
+          step: "SENDING",
+          currentRoomIndex: i + 1,
+          totalRooms: targetRooms.length,
+          tenant: room.tenant,
+          phone: room.phone,
+          roomId: room.id,
+          detail: isMobile
+            ? `Đang mở hộp thoại chia sẻ Zalo trọn bộ 4 file cho ${room.tenant}...`
+            : `Đang chuẩn bị chứng từ & mở Zalo khách ${room.tenant}...`,
+          timestamp: new Date().toLocaleTimeString("vi-VN"),
+        });
 
-      setResultsLog((prev) => ({
-        ...prev,
-        [r.id]: { ...prev[r.id], status: "SUCCESS", stepText: "Đã tạo file và đánh dấu gửi" },
-      }));
+        // 2. Điều phối gửi thực sự
+        const result = await dispatchBundle4In1(bundle, {
+          openZalo: true,
+          copyClipboard: true,
+          saveFiles: true,
+          hostSession,
+        });
+
+        onConfirmSent(room.id);
+
+        setResultsLog((prev) => ({
+          ...prev,
+          [room.id]: {
+            ...prev[room.id],
+            status: result.success ? "SUCCESS" : "FAILED",
+            stepText: result.message,
+            error: result.success ? undefined : result.detail,
+          },
+        }));
+      } catch (err: any) {
+        setResultsLog((prev) => ({
+          ...prev,
+          [room.id]: {
+            ...prev[room.id],
+            status: "FAILED",
+            stepText: `Lỗi kết xuất: ${err.message}`,
+            error: err.message,
+          },
+        }));
+      }
+
+      // Nghỉ an toàn giữa các phòng để người dùng kịp tương tác gửi qua Zalo
+      if (i < targetRooms.length - 1 && !abortBatchRef.current) {
+        const waitSeconds = isMobile ? 3 : 2;
+        for (let sec = waitSeconds; sec > 0; sec--) {
+          if (abortBatchRef.current) break;
+          setCurrentProgress({
+            step: "DELAYING",
+            currentRoomIndex: i + 1,
+            totalRooms: targetRooms.length,
+            tenant: room.tenant,
+            phone: room.phone,
+            roomId: room.id,
+            countdownSeconds: sec,
+            detail: `Nghỉ an toàn: Chuẩn bị chuyển sang phòng ${targetRooms[i + 1].id} sau ${sec}s...`,
+            timestamp: new Date().toLocaleTimeString("vi-VN"),
+          });
+          await new Promise((res) => setTimeout(res, 1000));
+        }
+      }
     }
 
     setIsRobotRunning(false);
+    setCurrentProgress({
+      step: "BATCH_DONE",
+      currentRoomIndex: targetRooms.length,
+      totalRooms: targetRooms.length,
+      detail: "Đã hoàn thành toàn bộ chu trình điều phối hóa đơn!",
+      timestamp: new Date().toLocaleTimeString("vi-VN"),
+    });
+    setRobotStatusText("Đã hoàn tất điều phối trọn gói cho toàn bộ khách thuê thành công!");
     await onAutoSendAll();
   };
 
-  // Gửi thử nghiệm trực tiếp đến số Zalo người dùng nhập
+  // 5. Gửi thử nghiệm thực sự trọn bộ 5-trong-1 đến số Zalo người dùng nhập
   const handleSendTestToMyPhone = async () => {
     const clean = testPhone.trim().replace(/[^\d]/g, "");
     if (clean.length < 9) {
@@ -372,27 +484,58 @@ export default function AutoZaloSenderModal({
       zaloName: "Zalo của bạn",
     };
 
-    const message = buildReminderMessage(customRoom, settings);
-    await handleCopyText(message, "test");
+    setTestSuccessMessage("⏳ Đang kết xuất trọn bộ chứng từ 5-trong-1 (VietQR, Viết tay, Phiếu thu, Excel)...");
 
-    onDownloadExcelInvoice(customRoom);
+    try {
+      const hostSession = getStoredZaloHostSession();
+      const bundle = await buildRoomInvoiceBundle4In1(customRoom, settings, hostSession);
+      const res = await dispatchBundle4In1(bundle, {
+        openZalo: true,
+        copyClipboard: true,
+        saveFiles: true,
+        hostSession,
+      });
 
-    const zaloUrl = buildZaloChatUrl(clean);
-    window.open(zaloUrl, "_blank");
+      if (res.success) {
+        setTestSuccessMessage(
+          `✅ Đã điều phối trọn gói thành công tới số ${clean}! Tin nhắn đã copy vào clipboard, các file chứng từ đã được chuẩn bị và mở cuộc trò chuyện Zalo thật!`
+        );
+      } else {
+        setTestSuccessMessage(`⚠️ ${res.message}`);
+      }
+    } catch (err: any) {
+      setTestSuccessMessage(`❌ Lỗi gửi thử: ${err.message}`);
+    }
 
-    setTestSuccessMessage(
-      `✅ Đã mở cuộc trò chuyện Zalo với số ${clean}! Tin nhắn & link VietQR đã được copy vào clipboard, file Excel đã tải về. Nhấn Ctrl+V để gửi!`
-    );
-    setTimeout(() => setTestSuccessMessage(null), 8000);
+    setTimeout(() => setTestSuccessMessage(null), 10000);
   };
 
+  // 6. Điều phối thực sự cho một phòng đơn lẻ
   const handleDispatchSingleToZalo = async (room: Room) => {
-    const message = buildReminderMessage(room, settings);
-    await handleCopyText(message, room.id);
-    onDownloadExcelInvoice(room);
-    const zaloUrl = buildZaloChatUrl(room.phone);
-    window.open(zaloUrl, "_blank");
-    onConfirmSent(room.id);
+    try {
+      const hostSession = getStoredZaloHostSession();
+      const bundle = await buildRoomInvoiceBundle4In1(room, settings, hostSession);
+      const res = await dispatchBundle4In1(bundle, {
+        openZalo: true,
+        copyClipboard: true,
+        saveFiles: true,
+        hostSession,
+      });
+      onConfirmSent(room.id);
+      if (res.copiedText) {
+        setCopiedId(room.id);
+        setTimeout(() => setCopiedId(null), 3000);
+      }
+    } catch (err: any) {
+      console.error("Lỗi gửi đơn lẻ:", err);
+      // Fallback nếu có sự cố
+      const message = buildReminderMessage(room, settings);
+      await handleCopyText(message, room.id);
+      onDownloadExcelInvoice(room);
+      const zaloUrl = buildZaloChatUrl(room.phone);
+      window.open(zaloUrl, "_blank");
+      onConfirmSent(room.id);
+    }
   };
 
   const totalDebt = unpaidRooms.reduce((s, r) => s + roomTotal(r, settings), 0);
@@ -424,6 +567,11 @@ export default function AutoZaloSenderModal({
                   <span className="rounded-full bg-emerald-500/20 px-2.5 py-0.5 text-[10px] font-bold text-emerald-300 ring-1 ring-emerald-500/40 flex items-center gap-1">
                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
                     DESKTOP NATIVE .EXE
+                  </span>
+                ) : isNativeMobile() ? (
+                  <span className="rounded-full bg-indigo-500/20 px-2.5 py-0.5 text-[10px] font-bold text-indigo-300 ring-1 ring-indigo-500/40 flex items-center gap-1">
+                    <Smartphone className="w-3 h-3 shrink-0" />
+                    MOBILE NATIVE SHARE
                   </span>
                 ) : (
                   <span className="rounded-full bg-amber-500/20 px-2.5 py-0.5 text-[10px] font-bold text-amber-300 ring-1 ring-amber-500/40 flex items-center gap-1">
@@ -922,8 +1070,8 @@ export default function AutoZaloSenderModal({
                     </div>
                   </div>
 
-                  {/* 2 Khối Tệp đính kèm: Excel Hóa đơn & Ảnh VietQR */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* 3 Khối Tệp đính kèm: Excel Hóa đơn, Ảnh Phiếu Thu & Ảnh Viết Tay Vintage */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     {/* File Excel */}
                     <div className="flex items-center justify-between rounded-2xl border border-emerald-200 bg-emerald-50/40 p-3.5">
                       <div className="flex items-center gap-2.5 min-w-0">
@@ -975,6 +1123,32 @@ export default function AutoZaloSenderModal({
                         <span>Tải ảnh</span>
                       </button>
                     </div>
+
+                    {/* Ảnh Hóa Đơn Viết Tay Vintage */}
+                    <div className="flex items-center justify-between rounded-2xl border border-indigo-200 bg-indigo-50/40 p-3.5">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-xs">
+                          <PenTool className="w-5 h-5 shrink-0" />
+                        </span>
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-indigo-950 truncate">
+                            Hoa-Don-Viet-Tay-{activeRoom.id}.png
+                          </p>
+                          <p className="text-[11px] text-indigo-700">
+                            Ảnh viết tay của cô chủ nhà
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => downloadHandwrittenBillPng(activeRoom, settings, getStoredZaloHostSession())}
+                        className="inline-flex h-8 items-center gap-1 rounded-lg bg-indigo-600 px-2.5 text-[11px] font-bold text-white hover:bg-indigo-700 shadow-2xs shrink-0 ml-2"
+                        title="Tải ảnh hóa đơn viết tay PNG về máy"
+                      >
+                        <Download className="w-3 h-3 shrink-0" />
+                        <span>Tải ảnh</span>
+                      </button>
+                    </div>
                   </div>
 
                   {/* Hộp Tin Nhắn Zalo Đã Soạn Sẵn */}
@@ -1006,9 +1180,13 @@ export default function AutoZaloSenderModal({
               <span>
                 🖥️ Chế độ Desktop Native: Robot Playwright tự động chạy ngầm và lưu hóa đơn tại thư mục <strong>Documents/QuanLyPhongTro/HoaDon/</strong>.
               </span>
+            ) : isNativeMobile() ? (
+              <span>
+                📱 Chế độ Mobile Native: Tự động copy tin nhắn, ghi 4 file chứng từ vào bộ nhớ tạm Cache và mở Native Share Sheet để gửi Zalo cho khách.
+              </span>
             ) : (
               <span>
-                🌐 Đang chạy trên trình duyệt Web. Để kích hoạt Robot tự động hóa Zalo 100% rảnh tay, hãy khởi chạy file <strong>.exe</strong> của phần mềm.
+                🌐 Chế độ Trình duyệt Web: Tự động tải 3 file chứng từ (VietQR, Viết tay, Excel), sao chép tin nhắn đa dòng và mở cuộc trò chuyện Zalo trực tiếp.
               </span>
             )}
           </p>

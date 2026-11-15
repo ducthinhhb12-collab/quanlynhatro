@@ -230,6 +230,21 @@ export default function App() {
     };
   }, []);
 
+  // Nhận diện Hệ điều hành thiết bị để tự động tối ưu hóa giao diện (iOS / Android / Desktop)
+  const [deviceOsClass, setDeviceOsClass] = useState<string>("os-desktop");
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const ua = navigator.userAgent || "";
+      if (/iPad|iPhone|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)) {
+        setDeviceOsClass("os-ios");
+      } else if (/Android/.test(ua)) {
+        setDeviceOsClass("os-android");
+      } else {
+        setDeviceOsClass("os-desktop");
+      }
+    }
+  }, []);
+
   // Mở khóa âm thanh WebAudio trên iOS & Ẩn Splash Screen sau khi React 19 mount xong
   useEffect(() => {
     initAudioUnlocker();
@@ -1086,11 +1101,13 @@ export default function App() {
     customerManagerOpen ||
     mobileAppQrOpen;
 
-  // 3D Interaction Lock: Khóa khi RoomDrawer đang mở (selectedRoom !== null) hoặc bất kỳ modal nào đang mở
-  const is3DInteractionLocked = selectedRoom !== null || isAnyModalOpen;
+  // 3D Interaction Lock: Khóa khi RoomDrawer đang mở (selectedRoom !== null), modal mở, hoặc không ở tab 3D
+  const is3DInteractionLocked = selectedRoom !== null || isAnyModalOpen || mobileTab !== "3d";
+  // Nhãn 3D ("P101", "TẦNG 1, 2, 3") chỉ hiển thị khi ở tab 3D và KHÔNG có bất kỳ modal hoặc drawer nào mở (Triệt tiêu 100% lỗi đè chữ)
+  const shouldShow3DLabels = mobileTab === "3d" && !isAnyModalOpen && !selectedRoom;
 
   return (
-    <div className="h-app-dvh h-[100dvh] w-full overflow-hidden bg-slate-50 flex flex-col">
+    <div className={cn("h-app-dvh h-[100dvh] w-full overflow-hidden bg-slate-50 flex flex-col", deviceOsClass)}>
       {/* Thu gọn Header trên mobile thành thanh trạng thái tối giản, áp dụng safe-top */}
       <div className="safe-top pt-[env(safe-area-inset-top,0px)] w-full shrink-0">
         <Header
@@ -1146,6 +1163,7 @@ export default function App() {
               setMobileTab("rooms");
             }}
             isLocked={is3DInteractionLocked}
+            showLabels={shouldShow3DLabels}
           />
         </div>
 

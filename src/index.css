@@ -341,3 +341,161 @@ input, textarea, select {
   }
 }
 
+/* =========================================================================
+   7. Tùy biến giao diện theo Hệ điều hành (.os-ios, .os-android, .os-desktop)
+   Tối ưu Safe-area, Bo góc công thái học, Cuộn mượt và Font chữ đặc trưng
+   ========================================================================= */
+
+/* --- 7.1 Giao diện Chuẩn Apple iOS (.os-ios) --- */
+.os-ios {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "SF Pro", "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: -0.011em;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+  --sat: env(safe-area-inset-top, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --radius-card: 1.25rem;
+  --radius-btn: 0.875rem;
+  --radius-sheet: 1.5rem;
+}
+
+.os-ios input,
+.os-ios textarea,
+.os-ios select {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "SF Pro", "Helvetica Neue", Arial, sans-serif;
+  border-radius: 0.75rem;
+}
+
+.os-ios .rounded-ios-card {
+  border-radius: 1.25rem;
+}
+
+.os-ios .rounded-ios-btn {
+  border-radius: 0.875rem;
+}
+
+.os-ios button:active,
+.os-ios .interactive-tap:active {
+  transform: scale(0.97);
+  transition: transform 0.12s ease-out;
+}
+
+/* --- 7.2 Giao diện Chuẩn Google Android Material 3 (.os-android) --- */
+.os-android {
+  font-family: "Roboto", "Google Sans", "Noto Sans", system-ui, -apple-system, sans-serif;
+  letter-spacing: 0.01em;
+  scroll-behavior: smooth;
+  overscroll-behavior-y: contain;
+  --sat: env(safe-area-inset-top, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --radius-card: 1rem;
+  --radius-btn: 0.75rem;
+  --radius-sheet: 1.75rem;
+}
+
+.os-android input,
+.os-android textarea,
+.os-android select {
+  font-family: "Roboto", "Google Sans", "Noto Sans", system-ui, -apple-system, sans-serif;
+  border-radius: 0.625rem;
+}
+
+.os-android .rounded-android-card {
+  border-radius: 1rem;
+}
+
+.os-android .rounded-android-btn {
+  border-radius: 0.75rem;
+}
+
+.os-android button:active,
+.os-android .interactive-tap:active {
+  filter: brightness(0.94);
+  transition: filter 0.1s ease-out;
+}
+
+/* --- 7.3 Giao diện Chuẩn Desktop & Web (.os-desktop) --- */
+.os-desktop {
+  font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --sat: 0px;
+  --sar: 0px;
+  --sab: 0px;
+  --sal: 0px;
+  --radius-card: 0.75rem;
+  --radius-btn: 0.5rem;
+  --radius-sheet: 1rem;
+  cursor: default;
+}
+
+.os-desktop button,
+.os-desktop a,
+.os-desktop [role="button"],
+.os-desktop select,
+.os-desktop input[type="button"],
+.os-desktop input[type="submit"],
+.os-desktop input[type="checkbox"],
+.os-desktop input[type="radio"] {
+  cursor: pointer;
+}
+
+.os-desktop {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+.os-desktop ::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+
+.os-desktop ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.os-desktop ::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+  transition: background 0.2s ease;
+}
+
+.os-desktop ::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* =========================================================================
+   8. Drei 3D HTML Labels & Modal Isolation
+   Triệt để chống nhãn 3D ("TẦNG 1, 2, 3" và "P101", "P102"...) bị nổi đè xuyên qua
+   các Modal, Bottom Sheet, Drawer (z-40 / z-50)
+   ========================================================================= */
+
+/* Rule bắt buộc cho Drei Html container */
+.r3f-html {
+  z-index: 5 !important;
+}
+
+/* Các container do Drei sinh ra bao quanh hoặc chứa .r3f-html */
+div:has(> .r3f-html),
+div:has(> [data-r3f-html]),
+.r3f-html-container,
+div[class*="r3f-html"] {
+  z-index: 5 !important;
+}
+
+/* Phòng vệ toàn diện: Ép mọi inline style z-index Drei (16777xxx) về mức z-index an toàn */
+div[style*="z-index: 1677"],
+div[style*="z-index: 16777"] {
+  z-index: 5 !important;
+}
+
+/* Bảo đảm mọi phần tử nhãn 3D Drei không bao giờ vượt qua z-index 5 */
+.r3f-html * {
+  max-z-index: 5;
+}
+
+

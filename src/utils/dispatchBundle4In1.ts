@@ -19,6 +19,7 @@ import type { InvoiceBundle4In1, DispatchResult4In1, ZaloHostSession } from "../
 import { formatNumber, formatVND, electricityAmount, roomTotal, buildVietQrUrl } from "./format";
 import { generateRoomInvoiceWorkbook } from "./invoiceGenerator";
 import { renderReceiptCanvas, readVNDToWords } from "./receiptCanvasRenderer";
+import { renderHandwrittenBillCanvas } from "./handwrittenBillRenderer";
 import {
   isNativeMobile,
   isElectron,
@@ -129,11 +130,12 @@ export const buildRoomInvoiceBundle4In1 = async (
     `- Chủ tài khoản: ${settings.accountName}`,
     `- Cú pháp CK bắt buộc: THANHTOAN ${room.id}`,
     ``,
-    `📁 BỘ CHỨNG TỪ 4-TRONG-1 GỒM:`,
+    `📁 BỘ CHỨNG TỪ TRỌN GÓI 5-TRONG-1 GỒM:`,
     `1. Bảng kê chi phí dạng tin nhắn`,
     `2. Ảnh mã VietQR thanh toán tự điền thông tin`,
     `3. Ảnh Phiếu Thu 2x Retina có dấu mộc điện tử`,
-    `4. File bảng tính Excel (.xlsx) lưu trữ`,
+    `4. Ảnh Hóa Đơn Viết Tay Vintage của cô chủ nhà`,
+    `5. File bảng tính Excel (.xlsx) lưu trữ`,
     room.zaloNote ? `📌 Ghi chú: ${room.zaloNote}\n` : "",
     `Xin chân thành cảm ơn Quý khách!`,
     `(${hostSignInfo})`,
@@ -151,6 +153,14 @@ export const buildRoomInvoiceBundle4In1 = async (
   const excelWorkbook = generateRoomInvoiceWorkbook(room, settings);
   const excelFileName = `Hoa-Don-Phong-${room.id}.xlsx`;
 
+  // THÀNH PHẦN 5: Ảnh Hóa Đơn Viết Tay Vintage (.png Base64)
+  let handwrittenBillPngDataUrl = "";
+  try {
+    handwrittenBillPngDataUrl = await renderHandwrittenBillCanvas(room, settings, session);
+  } catch (hwErr) {
+    console.error("Lỗi tạo ảnh hóa đơn viết tay:", hwErr);
+  }
+
   return {
     roomId: room.id,
     tenantName: room.tenant || "Phòng trống",
@@ -162,6 +172,7 @@ export const buildRoomInvoiceBundle4In1 = async (
     textMessage,
     vietQrDataUrl,
     receiptPngDataUrl,
+    handwrittenBillPngDataUrl,
     excelWorkbook,
     excelFileName,
   };
@@ -220,6 +231,17 @@ export const dispatchBundle4In1 = async (
         sharedUris.push(excelFile.uri);
       }
 
+      // Ghi File 4: Ảnh Hóa Đơn Viết Tay Vintage
+      if (bundle.handwrittenBillPngDataUrl) {
+        const cleanHandwrittenBase64 = bundle.handwrittenBillPngDataUrl.replace(/^data:image\/\w+;base64,/, "");
+        const handwrittenFile = await Filesystem.writeFile({
+          path: `Hoa-Don-Viet-Tay-${bundle.roomId}.png`,
+          data: cleanHandwrittenBase64,
+          directory: Directory.Cache,
+        });
+        sharedUris.push(handwrittenFile.uri);
+      }
+
       // Kích hoạt rung và chuông phản hồi
       await playTingTingNative();
 
@@ -229,7 +251,7 @@ export const dispatchBundle4In1 = async (
           title: `Hóa Đơn Phòng ${bundle.roomId} - An Gia Smart Home`,
           text: bundle.textMessage,
           files: sharedUris,
-          dialogTitle: `Gửi trọn bộ Hóa Đơn 4-trong-1 Phòng ${bundle.roomId} qua Zalo`,
+          dialogTitle: `Gửi trọn bộ Hóa Đơn 5-trong-1 Phòng ${bundle.roomId} qua Zalo`,
         });
       } catch (shareErr) {
         // Người dùng có thể đóng share sheet, không tính là lỗi hệ thống
@@ -238,7 +260,7 @@ export const dispatchBundle4In1 = async (
 
       return {
         success: true,
-        message: `Đã sao chép tin nhắn và chuẩn bị 3 file chứng từ (Phiếu thu 2x, VietQR, Excel) cho phòng ${bundle.roomId}! Chọn Zalo trong danh sách để gửi ngay cho ${bundle.tenantName}.`,
+        message: `Đã sao chép tin nhắn và chuẩn bị 4 file chứng từ (Phiếu thu 2x, Hóa đơn viết tay, VietQR, Excel) cho phòng ${bundle.roomId}! Chọn Zalo trong danh sách để gửi ngay cho ${bundle.tenantName}.`,
         timestamp: timeNow,
         copiedText: textCopied,
         sharedFiles: sharedUris,
@@ -275,7 +297,7 @@ export const dispatchBundle4In1 = async (
       try {
         await window.electronAPI.showNotification({
           title: `An Gia Smart Home - Hóa Đơn ${bundle.roomId}`,
-          body: `Đã sẵn sàng trọn bộ 4-trong-1 cho ${bundle.tenantName}. Tin nhắn đã copy vào clipboard!`,
+          body: `Đã sẵn sàng trọn bộ 5-trong-1 cho ${bundle.tenantName}. Tin nhắn đã copy vào clipboard!`,
         });
       } catch {
         // Bỏ qua nếu thông báo bị chặn
@@ -340,6 +362,17 @@ export const dispatchBundle4In1 = async (
         setTimeout(() => URL.revokeObjectURL(url), 1000);
         downloadedFiles.push(bundle.excelFileName);
       }
+
+      // 3. Tự động tải ảnh Hóa Đơn Viết Tay Vintage
+      if (bundle.handwrittenBillPngDataUrl) {
+        const linkHandwritten = document.createElement("a");
+        linkHandwritten.href = bundle.handwrittenBillPngDataUrl;
+        linkHandwritten.download = `Hoa-Don-Viet-Tay-${bundle.roomId}.png`;
+        document.body.appendChild(linkHandwritten);
+        linkHandwritten.click();
+        linkHandwritten.remove();
+        downloadedFiles.push(`Hoa-Don-Viet-Tay-${bundle.roomId}.png`);
+      }
     }
 
     // Mở trang chat Zalo của khách
@@ -351,7 +384,7 @@ export const dispatchBundle4In1 = async (
 
     return {
       success: true,
-      message: `[Web] Đã tải về Phiếu Thu 2x & Bảng tính Excel, sao chép tin nhắn vào clipboard và mở Zalo của ${bundle.tenantName}! Nhấn Ctrl+V để gửi tin.`,
+      message: `[Web] Đã tải về Phiếu Thu 2x, Hóa Đơn Viết Tay & Bảng tính Excel, sao chép tin nhắn vào clipboard và mở Zalo của ${bundle.tenantName}! Nhấn Ctrl+V để gửi tin.`,
       timestamp: timeNow,
       copiedText: textCopied,
       sharedFiles: downloadedFiles,
@@ -368,3 +401,10 @@ export const dispatchBundle4In1 = async (
     };
   }
 };
+
+/**
+ * Bí danh tương thích cho hệ thống mở rộng 5-trong-1
+ */
+export const buildRoomInvoiceBundle5In1 = buildRoomInvoiceBundle4In1;
+export const dispatchBundle5In1 = dispatchBundle4In1;
+

@@ -32,6 +32,7 @@ interface BlockProps {
   onHover: (id: string | null) => void;
   onSelect: (id: string) => void;
   portalRef?: React.RefObject<HTMLDivElement | null>;
+  showLabels?: boolean;
 }
 
 function RoomBlock({
@@ -45,6 +46,7 @@ function RoomBlock({
   onHover,
   onSelect,
   portalRef,
+  showLabels = true,
 }: BlockProps) {
   const x = (room.col - centerCol) * COL_STEP;
   const y = (room.floor - 1) * FLOOR_STEP;
@@ -107,26 +109,38 @@ function RoomBlock({
         </mesh>
 
         {/* Nhãn phòng dạng 3D HTML Badge */}
-        <Html position={[0, ROOM_H * 0.55, ROOM_D / 2 + 0.02]} center transform sprite portal={portalRef as any}>
-          <div
-            onClick={(e) => {
-              e.stopPropagation();
-              onSelect(room.id);
-            }}
-            className={cn(
-              "select-none rounded-xl px-2.5 py-1 text-center font-bold tracking-tight shadow-md transition-all",
-              selected
-                ? "scale-110 bg-slate-900 text-white ring-2 ring-white"
-                : "bg-white/95 text-slate-800 hover:scale-105",
-              dimmed && "opacity-40"
-            )}
+        {showLabels && (
+          <Html
+            position={[0, ROOM_H * 0.55, ROOM_D / 2 + 0.02]}
+            center
+            transform
+            sprite
+            portal={portalRef as any}
+            zIndexRange={[5, 0]}
+            className="r3f-html pointer-events-auto"
+            wrapperClass="r3f-html"
           >
-            <p className="text-[11px] leading-tight font-black">{room.id}</p>
-            <p className="text-[9px] font-semibold text-rose-600 tabular-nums">
-              {room.status === "EMPTY" ? "Trống" : formatVND(total)}
-            </p>
-          </div>
-        </Html>
+            <div
+              onClick={(e) => {
+                e.stopPropagation();
+                onSelect(room.id);
+              }}
+              style={{ zIndex: 5 }}
+              className={cn(
+                "select-none rounded-xl px-2.5 py-1 text-center font-bold tracking-tight shadow-md transition-all z-[5]",
+                selected
+                  ? "scale-110 bg-slate-900 text-white ring-2 ring-white"
+                  : "bg-white/95 text-slate-800 hover:scale-105",
+                dimmed && "opacity-40"
+              )}
+            >
+              <p className="text-[11px] leading-tight font-black">{room.id}</p>
+              <p className="text-[9px] font-semibold text-rose-600 tabular-nums">
+                {room.status === "EMPTY" ? "Trống" : formatVND(total)}
+              </p>
+            </div>
+          </Html>
+        )}
       </group>
     </group>
   );
@@ -142,6 +156,7 @@ interface SceneProps {
   onSelect: (id: string) => void;
   isMobile?: boolean;
   portalRef?: React.RefObject<HTMLDivElement | null>;
+  showLabels?: boolean;
 }
 
 function BuildingScene({
@@ -154,6 +169,7 @@ function BuildingScene({
   onSelect,
   isMobile = false,
   portalRef,
+  showLabels = true,
 }: SceneProps) {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
 
@@ -205,23 +221,33 @@ function BuildingScene({
         })}
 
         {/* Nhãn tầng bên cạnh */}
-        {availableFloors.map((floorNum) => {
-          const isSelected = selectedFloor === 0 || selectedFloor === floorNum;
-          const labelX = -(slabW / 2 + 1.35);
-          const labelY = (floorNum - 1) * FLOOR_STEP + 0.55;
-          return (
-            <Html key={`floor-lbl-${floorNum}`} position={[labelX, labelY, 0]} center portal={portalRef as any}>
-              <div
-                className={cn(
-                  "pointer-events-none whitespace-nowrap text-[10px] font-extrabold tracking-[0.2em] transition-colors",
-                  isSelected ? "text-slate-500 font-black" : "text-slate-300"
-                )}
+        {showLabels &&
+          availableFloors.map((floorNum) => {
+            const isSelected = selectedFloor === 0 || selectedFloor === floorNum;
+            const labelX = -(slabW / 2 + 1.35);
+            const labelY = (floorNum - 1) * FLOOR_STEP + 0.55;
+            return (
+              <Html
+                key={`floor-lbl-${floorNum}`}
+                position={[labelX, labelY, 0]}
+                center
+                portal={portalRef as any}
+                zIndexRange={[5, 0]}
+                className="r3f-html pointer-events-none"
+                wrapperClass="r3f-html"
               >
-                TẦNG {floorNum}
-              </div>
-            </Html>
-          );
-        })}
+                <div
+                  style={{ zIndex: 5 }}
+                  className={cn(
+                    "pointer-events-none whitespace-nowrap text-[10px] font-extrabold tracking-[0.2em] transition-colors z-[5]",
+                    isSelected ? "text-slate-500 font-black" : "text-slate-300"
+                  )}
+                >
+                  TẦNG {floorNum}
+                </div>
+              </Html>
+            );
+          })}
 
         {/* Các khối phòng 3D */}
         {rooms.map((room) => {
@@ -242,6 +268,7 @@ function BuildingScene({
               onHover={setHoveredId}
               onSelect={onSelect}
               portalRef={portalRef}
+              showLabels={showLabels}
             />
           );
         })}
@@ -278,6 +305,7 @@ function BuildingScene({
 interface Props extends SceneProps {
   onSelectFloor: (floor: number) => void;
   isLocked?: boolean;
+  showLabels?: boolean;
 }
 
 export default function Building3D({
@@ -285,6 +313,7 @@ export default function Building3D({
   selectedFloor,
   onSelectFloor,
   isLocked = false,
+  showLabels = true,
   ...sceneProps
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -305,7 +334,10 @@ export default function Building3D({
   }, [rooms]);
 
   return (
-    <div ref={containerRef} className={cn("relative h-full w-full", isLocked && "pointer-events-none")}>
+    <div
+      ref={containerRef}
+      className={cn("relative h-full w-full isolate z-0", isLocked && "pointer-events-none")}
+    >
       {/* Thanh chọn nhanh tầng ở góc trên bên phải vùng 3D */}
       <div className="pointer-events-auto absolute right-2.5 sm:right-5 top-2.5 sm:top-5 z-20 flex items-center gap-1.5 rounded-2xl border border-slate-200/90 bg-white/95 p-1.5 shadow-md backdrop-blur">
         <span className="flex items-center gap-1 pl-1.5 pr-1 text-xs font-semibold text-slate-500">
@@ -368,6 +400,7 @@ export default function Building3D({
           selectedFloor={selectedFloor}
           isMobile={isMobile}
           portalRef={containerRef}
+          showLabels={showLabels}
           {...sceneProps}
         />
       </Canvas>

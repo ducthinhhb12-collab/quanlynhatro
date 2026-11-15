@@ -35,6 +35,7 @@ export interface InvoiceBundle4In1 {
   receiptPngDataUrl: string;   // Thành phần 3: Ảnh Phiếu Thu 2x Retina (.png Base64)
   excelWorkbook: any;          // Thành phần 4: Bảng tính Excel Workbook
   excelFileName: string;       // Tên file Excel (.xlsx)
+  handwrittenBillPngDataUrl?: string; // Thành phần 5: Ảnh Hóa Đơn Viết Tay Vintage (.png Base64)
 }
 
 export interface DispatchResult4In1 {

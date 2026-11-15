@@ -25,6 +25,9 @@ export interface Room {
   lastAutoSentAt?: string; // Thời gian Agent tự động gửi thu tiền gần nhất
   hasExcelInvoice?: boolean; // Đã tạo file Excel hóa đơn riêng
   hasImageInvoice?: boolean; // Đã chụp ảnh phiếu thu hóa đơn
+  meterPhotoUrl?: string; // URL hoặc Base64 ảnh chụp công tơ điện
+  electricMeterReadDate?: string; // Ngày giờ chụp / đọc công tơ
+  handwrittenBillUrl?: string; // Ảnh hóa đơn viết tay đã kết xuất
 }
 
 export interface BankOption {
@@ -43,6 +46,8 @@ export interface Settings {
   zaloWebhookUrl?: string; // Webhook gửi tin tự động
   zaloAccessToken?: string; // Token Zalo OA/ZNS
   handsFreeMode?: boolean; // Chế độ Rảnh tay 100%: Agent tự động chạy toàn bộ không cần người bấm
+  customQrImage?: string; // Ảnh mã QR tùy chỉnh (Zalo Pay / VietQR riêng của chủ nhà)
+  adminPin?: string; // Mã PIN Admin (mặc định '8888')
 }
 
 export interface ToastState {

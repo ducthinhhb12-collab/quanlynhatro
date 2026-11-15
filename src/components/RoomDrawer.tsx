@@ -23,6 +23,11 @@ import {
   UserPlus,
   Trash2,
   AlertTriangle,
+  Camera,
+  Check,
+  Loader2,
+  RefreshCw,
+  FileText,
 } from "lucide-react";
 import type { Room, Settings } from "../types";
 import {
@@ -47,6 +52,11 @@ import {
 } from "../utils/platformBridge";
 import { cn } from "../utils/cn";
 import { TactileButton } from "./ui/TactileButton";
+import { analyzeElectricMeterImage } from "../utils/meterOcrAgent";
+import {
+  renderHandwrittenBillCanvas,
+  downloadHandwrittenBillPng,
+} from "../utils/handwrittenBillRenderer";
 
 interface Props {
   room: Room | null;
@@ -129,6 +139,16 @@ export default function RoomDrawer({
   const [showPreviewMessage, setShowPreviewMessage] = useState(false);
   const [offlineQr, setOfflineQr] = useState<string>("");
 
+  // AI OCR & Ảnh Công Tơ Điện
+  const [isAnalyzingMeter, setIsAnalyzingMeter] = useState(false);
+  const [meterAnalysisNotice, setMeterAnalysisNotice] = useState<{
+    kwh: number;
+    confidence: number;
+    rawText?: string;
+  } | null>(null);
+  const [isGeneratingHandwritten, setIsGeneratingHandwritten] = useState(false);
+  const meterFileInputRef = useRef<HTMLInputElement | null>(null);
+
   // Hộp thoại xác nhận xóa
   const [confirmDeleteTenant, setConfirmDeleteTenant] = useState(false);
   const [confirmDeleteRoom, setConfirmDeleteRoom] = useState(false);
@@ -188,6 +208,63 @@ export default function RoomDrawer({
   // Cuộn mượt trường nhập vào giữa màn hình khi mở bàn phím ảo
   const handleInputFocus = (e: React.FocusEvent<HTMLInputElement>) => {
     (e.target as HTMLElement).scrollIntoView({ behavior: "smooth", block: "center" });
+  };
+
+  // Xử lý khi người dùng chọn / chụp ảnh công tơ điện
+  const handleMeterPhotoFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !shown) return;
+
+    triggerHaptic("medium");
+    setIsAnalyzingMeter(true);
+    setMeterAnalysisNotice(null);
+
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const dataUrl = String(reader.result || "");
+      const nowFormatted = new Date().toLocaleString("vi-VN");
+
+      // 1. Lưu ảnh vào room.meterPhotoUrl & cập nhật thời gian chụp
+      onUpdateRoomDetails(shown.id, {
+        meterPhotoUrl: dataUrl,
+        electricMeterReadDate: nowFormatted,
+      });
+
+      try {
+        // 2. Gọi analyzeElectricMeterImage để AI Agent nhận diện chỉ số mới
+        const ocrResult = await analyzeElectricMeterImage(file);
+        if (ocrResult && ocrResult.detectedKwh > 0) {
+          triggerHaptic("success");
+          setMeterAnalysisNotice({
+            kwh: ocrResult.detectedKwh,
+            confidence: ocrResult.confidence,
+            rawText: ocrResult.rawText,
+          });
+        }
+      } catch (err) {
+        console.error("Lỗi AI OCR nhận diện công tơ:", err);
+      } finally {
+        setIsAnalyzingMeter(false);
+        if (meterFileInputRef.current) {
+          meterFileInputRef.current.value = "";
+        }
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Tải Hóa Đơn Viết Tay (.png)
+  const handleDownloadHandwritten = async () => {
+    if (!shown) return;
+    setIsGeneratingHandwritten(true);
+    triggerHaptic("medium");
+    try {
+      await downloadHandwrittenBillPng(shown, settings);
+    } catch (err) {
+      console.error("Lỗi khi tải hóa đơn viết tay:", err);
+    } finally {
+      setIsGeneratingHandwritten(false);
+    }
   };
 
   const startEdit = () => {
@@ -279,11 +356,24 @@ export default function RoomDrawer({
     });
   };
 
+  // Kích hoạt gửi trọn bộ chứng từ cho khách
   const handleTriggerBundle4In1 = async () => {
     if (!shown || isDispatching) return;
     setIsDispatching(true);
     triggerHaptic("medium");
     try {
+      // Đảm bảo tạo sẵn ảnh hóa đơn viết tay trong hồ sơ phòng
+      if (!shown.handwrittenBillUrl) {
+        try {
+          const hwDataUrl = await renderHandwrittenBillCanvas(shown, settings);
+          if (hwDataUrl) {
+            onUpdateRoomDetails(shown.id, { handwrittenBillUrl: hwDataUrl });
+          }
+        } catch {
+          // Bỏ qua lỗi canvas
+        }
+      }
+
       if (onDispatchBundle4In1) {
         await onDispatchBundle4In1(shown);
       } else {
@@ -300,7 +390,8 @@ export default function RoomDrawer({
   const total = shown ? roomTotal(shown, settings) : 0;
   const isPaid = shown?.status === "PAID";
   const dueInfo = shown ? getDueStatusInfo(shown.dueDate) : null;
-  const displayQr = offlineQr;
+  // Ưu tiên hiển thị ảnh QR tùy chỉnh của chủ nhà nếu có, nếu không dùng mã QR VietQR động
+  const displayQr = settings.customQrImage || offlineQr;
   const composedMessage = shown ? buildReminderMessage(shown, settings) : "";
 
   useEffect(() => {
@@ -314,6 +405,16 @@ export default function RoomDrawer({
 
   return (
     <>
+      {/* Input ẩn để chụp hoặc chọn ảnh công tơ điện */}
+      <input
+        ref={meterFileInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={handleMeterPhotoFileChange}
+      />
+
       {/* Mobile Backdrop */}
       {open && (
         <div
@@ -799,22 +900,38 @@ export default function RoomDrawer({
                     value={formatVND(electricityAmount(shown, settings.electricUnitPrice))}
                     action={
                       !isEmpty ? (
-                        <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-1.5 text-xs">
-                          <span className="font-semibold text-slate-600">Sửa số mới:</span>
-                          <input
-                            type="number"
-                            min={shown.electricOld}
-                            value={shown.electricNew}
-                            onChange={(e) => {
-                              const val = Number(e.target.value);
-                              if (!Number.isNaN(val)) {
-                                onUpdateElectricNew(shown.id, val);
-                              }
+                        <div className="flex flex-wrap items-center gap-2 pt-1">
+                          <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-1.5 text-xs">
+                            <span className="font-semibold text-slate-600">Sửa số mới:</span>
+                            <input
+                              type="number"
+                              min={shown.electricOld}
+                              value={shown.electricNew}
+                              onChange={(e) => {
+                                const val = Number(e.target.value);
+                                if (!Number.isNaN(val)) {
+                                  onUpdateElectricNew(shown.id, val);
+                                }
+                              }}
+                              onFocus={handleInputFocus}
+                              className="w-24 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-900 outline-none focus:border-emerald-500 min-h-[40px]"
+                            />
+                            <span className="text-slate-400">kWh</span>
+                          </div>
+
+                          <button
+                            type="button"
+                            disabled={isAnalyzingMeter}
+                            onClick={() => {
+                              triggerHaptic("light");
+                              meterFileInputRef.current?.click();
                             }}
-                            onFocus={handleInputFocus}
-                            className="w-24 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-900 outline-none focus:border-emerald-500 min-h-[40px]"
-                          />
-                          <span className="text-slate-400">kWh</span>
+                            className="inline-flex min-h-[40px] items-center gap-1.5 rounded-xl border border-sky-300 bg-sky-50 px-3 py-1.5 text-xs font-bold text-sky-800 hover:bg-sky-100 active:scale-95 transition-all shadow-2xs"
+                            title="Chụp ảnh công tơ để AI đo số tự động"
+                          >
+                            <Camera className="w-3.5 h-3.5 shrink-0 text-sky-600" />
+                            <span>{shown.meterPhotoUrl ? "Chụp lại công tơ" : "📸 AI Đo Số Điện"}</span>
+                          </button>
                         </div>
                       ) : undefined
                     }
@@ -835,6 +952,136 @@ export default function RoomDrawer({
                   <p className="mt-1 text-[11px] text-slate-400">Tiêu thụ điện: {formatNumber(kwh)} kWh</p>
                 )}
               </div>
+
+              {/* 📸 Ảnh Công Tơ Điện & AI Đo Số Tự Động */}
+              {!isEmpty && (
+                <div className="rounded-2xl border border-sky-200 bg-sky-50/50 p-3.5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-sky-900">
+                      <Camera className="w-3.5 h-3.5 shrink-0 text-sky-600" />
+                      📸 Ảnh Công Tơ Điện & AI Đo Số Tự Động
+                    </p>
+                    {shown.meterPhotoUrl ? (
+                      <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-bold text-sky-800">
+                        Đã có ảnh công tơ
+                      </span>
+                    ) : (
+                      <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
+                        Chưa chụp ảnh
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Thông báo AI phát hiện số điện kWh */}
+                  {meterAnalysisNotice && (
+                    <div className="rounded-xl border border-emerald-300 bg-emerald-50 p-3 shadow-xs space-y-2 animate-in fade-in slide-in-from-top-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-start gap-2">
+                          <Sparkles className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5 animate-pulse" />
+                          <div className="text-xs">
+                            <p className="font-bold text-emerald-950">
+                              💡 AI Agent đã phát hiện số điện: <span className="text-sm font-extrabold text-emerald-700 underline">{meterAnalysisNotice.kwh} kWh</span>. Áp dụng ngay?
+                            </p>
+                            <p className="text-[11px] text-emerald-700 mt-0.5">
+                              Độ tin cậy: {Math.round(meterAnalysisNotice.confidence * 100)}% • Tiêu thụ: +{Math.max(0, meterAnalysisNotice.kwh - shown.electricOld)} kWh
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setMeterAnalysisNotice(null)}
+                          className="text-slate-400 hover:text-slate-600 p-0.5"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      <div className="flex items-center gap-2 pt-0.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            triggerHaptic("success");
+                            onUpdateElectricNew(shown.id, meterAnalysisNotice.kwh);
+                            setMeterAnalysisNotice(null);
+                          }}
+                          className="flex-1 inline-flex min-h-[38px] items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-3 text-xs font-bold text-white shadow-2xs hover:bg-emerald-700 active:scale-95 transition-all"
+                        >
+                          <Check className="w-3.5 h-3.5 shrink-0" />
+                          <span>Áp dụng ngay ({meterAnalysisNotice.kwh} kWh)</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setMeterAnalysisNotice(null)}
+                          className="min-h-[38px] rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 hover:bg-slate-50 active:scale-95"
+                        >
+                          Bỏ qua
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Hiển thị ảnh công tơ nếu đã chụp */}
+                  {shown.meterPhotoUrl ? (
+                    <div className="flex items-center gap-3 bg-white p-2.5 rounded-xl border border-sky-100 shadow-2xs">
+                      <img
+                        src={shown.meterPhotoUrl}
+                        alt={`Ảnh công tơ ${shown.id}`}
+                        className="h-16 w-20 shrink-0 rounded-lg border border-slate-200 object-cover bg-slate-100 shadow-2xs"
+                      />
+                      <div className="min-w-0 flex-1 text-xs space-y-1">
+                        <p className="font-bold text-slate-900 truncate">
+                          Chỉ số ghi nhận: {formatNumber(shown.electricNew)} kWh
+                        </p>
+                        <p className="text-[11px] text-slate-500 truncate">
+                          {shown.electricMeterReadDate ? `Chụp: ${shown.electricMeterReadDate}` : "Đã lưu ảnh công tơ"}
+                        </p>
+                        <div className="flex items-center gap-2 pt-0.5">
+                          <button
+                            type="button"
+                            disabled={isAnalyzingMeter}
+                            onClick={() => {
+                              triggerHaptic("light");
+                              meterFileInputRef.current?.click();
+                            }}
+                            className="inline-flex min-h-[34px] items-center gap-1 text-[11px] font-bold text-sky-700 hover:text-sky-900 active:scale-95"
+                          >
+                            <RefreshCw className={cn("w-3 h-3", isAnalyzingMeter && "animate-spin")} />
+                            <span>{isAnalyzingMeter ? "Đang quét AI..." : "Chụp lại ảnh khác"}</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center bg-white rounded-xl border border-dashed border-sky-300 p-3 space-y-2">
+                      <p className="text-xs font-semibold text-slate-700">Chụp ảnh công tơ điện để AI tự đo số</p>
+                      <p className="text-[11px] text-slate-500">
+                        Chụp trực tiếp từ camera điện thoại hoặc chọn ảnh trong máy, AI Agent sẽ tự động trích xuất số kWh mới nhất.
+                      </p>
+                      <button
+                        type="button"
+                        disabled={isAnalyzingMeter}
+                        onClick={() => {
+                          triggerHaptic("light");
+                          meterFileInputRef.current?.click();
+                        }}
+                        className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-sky-600 px-4 py-2 text-xs font-bold text-white shadow-2xs hover:bg-sky-700 active:scale-95 transition-all"
+                      >
+                        {isAnalyzingMeter ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <span>AI đang phân tích số điện...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Camera className="w-4 h-4" />
+                            <span>Chụp ảnh công tơ ngay</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Tổng thanh toán */}
               <div className="rounded-2xl bg-slate-900 p-4 text-white shadow-sm">
@@ -903,7 +1150,9 @@ export default function RoomDrawer({
                       </div>
                     )}
                     <div className="min-w-0 flex-1 text-xs">
-                      <p className="font-bold text-slate-900 truncate">Mã VietQR động: {formatVND(total)}</p>
+                      <p className="font-bold text-slate-900 truncate">
+                        {settings.customQrImage ? "Mã QR tùy chỉnh của chủ nhà" : `Mã VietQR động: ${formatVND(total)}`}
+                      </p>
                       <p className="text-[11px] text-slate-500 truncate">{settings.bankName} • {settings.accountNumber}</p>
                       <button
                         type="button"
@@ -927,14 +1176,14 @@ export default function RoomDrawer({
                 </div>
               )}
 
-              {/* HỒ SƠ HÓA ĐƠN ĐA PHƯƠNG TIỆN 4-TRONG-1 */}
+              {/* HỒ SƠ HÓA ĐƠN TRỌN BỘ 5-TRONG-1 (ĐÃ TÍCH HỢP HÓA ĐƠN VIẾT TAY & ẢNH CÔNG TƠ) */}
               {!isEmpty && (
                 <div className="rounded-2xl border border-emerald-200 bg-emerald-50/40 p-3.5 space-y-2.5">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
                       <Sparkles className="w-4 h-4 shrink-0 text-emerald-600" />
                       <p className="text-xs font-bold text-emerald-950">
-                        Hồ Sơ Hóa Đơn 4-trong-1
+                        Hồ Sơ Hóa Đơn Trọn Bộ 5-trong-1
                       </p>
                     </div>
                     <span className="inline-flex items-center gap-1 rounded-md bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
@@ -960,20 +1209,30 @@ export default function RoomDrawer({
                       <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
                       <span className="truncate">4. Bảng Excel (.xlsx)</span>
                     </div>
+                    <div className="flex items-center gap-1.5 bg-white p-2 rounded-xl border border-indigo-200 shadow-2xs col-span-2 sm:col-span-1">
+                      <span className="h-1.5 w-1.5 rounded-full bg-indigo-500 shrink-0" />
+                      <span className="truncate font-semibold text-indigo-900">5. Hóa đơn viết tay (.png)</span>
+                    </div>
+                    {shown.meterPhotoUrl && (
+                      <div className="flex items-center gap-1.5 bg-white p-2 rounded-xl border border-sky-200 shadow-2xs col-span-2 sm:col-span-1">
+                        <span className="h-1.5 w-1.5 rounded-full bg-sky-500 shrink-0" />
+                        <span className="truncate font-semibold text-sky-900">6. Ảnh công tơ điện</span>
+                      </div>
+                    )}
                   </div>
 
-                  {/* Tùy chọn tải riêng lẻ */}
-                  <div className="flex items-center justify-end gap-2 pt-1 border-t border-emerald-100/60">
+                  {/* Tùy chọn tải riêng lẻ từng chứng từ */}
+                  <div className="flex flex-wrap items-center justify-end gap-2 pt-1 border-t border-emerald-100/60">
                     <button
                       type="button"
                       onClick={() => {
                         triggerHaptic("light");
                         handleShareOrDownloadExcel();
                       }}
-                      className="inline-flex min-h-[48px] min-w-[48px] items-center justify-center gap-1.5 text-xs font-semibold text-emerald-700 hover:underline active:scale-[0.96] transition-transform duration-150 select-none touch-manipulation"
+                      className="inline-flex min-h-[44px] items-center justify-center gap-1 text-xs font-semibold text-emerald-700 hover:underline active:scale-[0.96] transition-transform select-none touch-manipulation px-2"
                       title="Tải riêng file Excel"
                     >
-                      <FileSpreadsheet className="w-4 h-4" />
+                      <FileSpreadsheet className="w-4 h-4 shrink-0" />
                       <span>Excel</span>
                     </button>
                     <span className="text-slate-300">•</span>
@@ -983,18 +1242,34 @@ export default function RoomDrawer({
                         triggerHaptic("light");
                         onDownloadReceiptImage?.(shown);
                       }}
-                      className="inline-flex min-h-[48px] min-w-[48px] items-center justify-center gap-1.5 text-xs font-semibold text-amber-700 hover:underline active:scale-[0.96] transition-transform duration-150 select-none touch-manipulation"
+                      className="inline-flex min-h-[44px] items-center justify-center gap-1 text-xs font-semibold text-amber-700 hover:underline active:scale-[0.96] transition-transform select-none touch-manipulation px-2"
                       title="Tải riêng ảnh phiếu thu PNG"
                     >
-                      <ImageIcon className="w-4 h-4" />
-                      <span>Ảnh thu PNG</span>
+                      <ImageIcon className="w-4 h-4 shrink-0" />
+                      <span>Phiếu thu</span>
+                    </button>
+                    <span className="text-slate-300">•</span>
+                    {/* Nút Tải Hóa Đơn Viết Tay (.png) */}
+                    <button
+                      type="button"
+                      disabled={isGeneratingHandwritten}
+                      onClick={handleDownloadHandwritten}
+                      className="inline-flex min-h-[44px] items-center justify-center gap-1 text-xs font-bold text-indigo-700 hover:underline active:scale-[0.96] transition-transform select-none touch-manipulation px-2"
+                      title="Tải Hóa Đơn Viết Tay (.png) phong cách giấy tập học sinh"
+                    >
+                      {isGeneratingHandwritten ? (
+                        <Loader2 className="w-4 h-4 shrink-0 animate-spin" />
+                      ) : (
+                        <FileText className="w-4 h-4 shrink-0" />
+                      )}
+                      <span>Tải Hóa Đơn Viết Tay (.png)</span>
                     </button>
                   </div>
                 </div>
               )}
             </div>
 
-            {/* Actions: Nút duy nhất nổi bật Gửi Hóa Đơn 4-trong-1 */}
+            {/* Actions: Nút gửi trọn bộ cho khách với ảnh viết tay và ảnh công tơ */}
             <div className="space-y-2 border-t border-slate-100 px-6 py-4 bg-white/95 backdrop-blur-xs">
               <TactileButton
                 variant="primary"
@@ -1005,7 +1280,7 @@ export default function RoomDrawer({
                 className="w-full text-sm font-bold shadow-md shadow-emerald-200/80 rounded-2xl min-h-[48px] h-12"
                 leftIcon={<Send className="w-4 h-4 shrink-0" />}
               >
-                <span>Gửi Hóa Đơn 4-trong-1</span>
+                <span>Gửi Trọn Bộ Hóa Đơn (Kèm Viết Tay & Công Tơ)</span>
               </TactileButton>
 
               <div className="grid grid-cols-2 gap-2 pt-0.5">
