@@ -19,11 +19,11 @@ jobs:
       - name: Checkout Source Code
         uses: actions/checkout@v4
 
-      - name: Set up Java JDK 17
+      - name: Set up Java JDK 21
         uses: actions/setup-java@v4
         with:
           distribution: "temurin"
-          java-version: "17"
+          java-version: "21"
           cache: "gradle"
 
       - name: Set up Node.js 20
@@ -79,5 +79,5 @@ jobs:
           body: |
             ## 🎉 Bản Cài Đặt Android Native Độc Lập (An Gia Smart Home 3D)
             - **Tên tệp:** `AnGiaSmartHome3D.apk`
-            - **Kiến trúc:** Capacitor 6 + React 19 + Three.js 3D (Offline-first / Zero-server)
+            - **Kiến trúc:** Capacitor 8 + React 19 + Three.js 3D (Offline-first / Zero-server)
             - **Cách cài đặt:** Tải file `.apk` về điện thoại Android, chạm mở file và chọn **Cài đặt**.
