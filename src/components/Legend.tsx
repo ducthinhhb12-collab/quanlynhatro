@@ -1,13 +1,4 @@
-import {
-  Box,
-  Calculator,
-  MessageCircle,
-  Wallet,
-  Filter,
-  X,
-  FileSpreadsheet,
-  Send,
-} from "lucide-react";
+import { Filter, X } from "lucide-react";
 import { STATUS_META } from "../utils/format";
 import type { RoomStatus } from "../types";
 import { cn } from "../utils/cn";
@@ -21,20 +12,10 @@ interface Props {
 
 const LEGEND_ORDER: RoomStatus[] = ["PAID", "PENDING", "OVERDUE", "EMPTY"];
 
-const DEPARTMENTS = [
-  { label: "Lập Hóa Đơn", Icon: FileSpreadsheet, tone: "text-amber-600 bg-amber-50" },
-  { label: "Thu Nợ 100% Rảnh Tay", Icon: Send, tone: "text-rose-600 bg-rose-50" },
-  { label: "Phòng Kế toán", Icon: Calculator, tone: "text-sky-600 bg-sky-50" },
-  { label: "Phòng CSKH Zalo", Icon: MessageCircle, tone: "text-blue-600 bg-blue-50" },
-  { label: "Phòng Ngân quỹ", Icon: Wallet, tone: "text-emerald-600 bg-emerald-50" },
-  { label: "Phòng 3D", Icon: Box, tone: "text-indigo-600 bg-indigo-50" },
-];
-
 export default function Legend({
   counts,
   filterStatus,
   onToggleFilterStatus,
-  onOpenAgentCompany,
 }: Props) {
   return (
     <div className="pointer-events-none absolute bottom-5 left-5 z-10 flex flex-col items-start gap-3">
@@ -92,27 +73,7 @@ export default function Legend({
           })}
         </div>
       </div>
-
-      {/* 4 huy hiệu phòng ban góc dưới trái - click để mở Công ty Agent */}
-      <div className="pointer-events-auto flex flex-wrap gap-2 max-w-[520px]">
-        {DEPARTMENTS.map(({ label, Icon, tone }) => (
-          <button
-            key={label}
-            type="button"
-            onClick={onOpenAgentCompany}
-            className="group flex items-center gap-2 rounded-full border border-slate-200 bg-white/95 py-1.5 pl-1.5 pr-3 text-xs font-medium text-slate-700 shadow-sm backdrop-blur transition-all hover:border-indigo-300 hover:bg-indigo-50/50 hover:text-indigo-900 active:scale-95"
-            title={`Bấm để mở AI Agent điều hành ${label}`}
-          >
-            <span
-              className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full transition-transform group-hover:scale-110 ${tone}`}
-            >
-              <Icon className="w-3.5 h-3.5 shrink-0" />
-            </span>
-            <span>{label}</span>
-            <span className="ml-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500 animate-pulse" />
-          </button>
-        ))}
-      </div>
     </div>
   );
 }
+

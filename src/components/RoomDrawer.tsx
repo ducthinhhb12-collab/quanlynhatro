@@ -19,20 +19,16 @@ import {
   Download,
   FileSpreadsheet,
   Image as ImageIcon,
-  Zap,
-  Bot,
   CheckCheck,
   UserPlus,
   Trash2,
   AlertTriangle,
-  Share2,
 } from "lucide-react";
 import type { Room, Settings } from "../types";
 import {
   STATUS_META,
   addOneMonthVN,
   buildReminderMessage,
-  buildVietQrUrl,
   downloadQrCodeImage,
   electricityAmount,
   formatNumber,
@@ -46,11 +42,11 @@ import {
   openZaloAppOrWeb,
   saveOrShareExcelWorkbook,
   triggerHaptic,
-  isNativeMobile,
   callPhoneNumber,
   generateQrDataUrlLocal,
 } from "../utils/platformBridge";
 import { cn } from "../utils/cn";
+import { TactileButton } from "./ui/TactileButton";
 
 interface Props {
   room: Room | null;
@@ -66,6 +62,7 @@ interface Props {
   onDownloadReceiptImage?: (room: Room) => void;
   onRemoveTenant?: (roomId: string) => void;
   onDeleteRoom?: (roomId: string) => void;
+  onDispatchBundle4In1?: (room: Room) => Promise<void> | void;
 }
 
 function Row({
@@ -112,12 +109,14 @@ export default function RoomDrawer({
   onDownloadReceiptImage,
   onRemoveTenant,
   onDeleteRoom,
+  onDispatchBundle4In1,
 }: Props) {
   const lastRef = useRef<Room | null>(null);
   if (room) lastRef.current = room;
   const shown = room ?? lastRef.current;
   const open = room !== null;
 
+  const [isDispatching, setIsDispatching] = useState(false);
   const [isEditingTenant, setIsEditingTenant] = useState(false);
   const [draftTenant, setDraftTenant] = useState("");
   const [draftPhone, setDraftPhone] = useState("");
@@ -221,6 +220,21 @@ export default function RoomDrawer({
       monthFolder: month,
       workbook: wb,
     });
+  };
+
+  const handleTriggerBundle4In1 = async () => {
+    if (!shown || isDispatching) return;
+    setIsDispatching(true);
+    triggerHaptic("medium");
+    try {
+      if (onDispatchBundle4In1) {
+        await onDispatchBundle4In1(shown);
+      } else {
+        onSendZaloMessage(shown);
+      }
+    } finally {
+      setIsDispatching(false);
+    }
   };
 
   const isEmpty = shown?.status === "EMPTY" || !shown?.tenant;
@@ -774,109 +788,111 @@ export default function RoomDrawer({
                 </div>
               )}
 
-              {/* TÀI LIỆU HÓA ĐƠN & ẢNH PHIẾU THU TỰ ĐỘNG BỞI AI AGENT */}
+              {/* HỒ SƠ HÓA ĐƠN ĐA PHƯƠNG TIỆN 4-TRONG-1 */}
               {!isEmpty && (
-                <div className="rounded-2xl border border-amber-200 bg-amber-50/40 p-3.5 space-y-2.5">
+                <div className="rounded-2xl border border-emerald-200 bg-emerald-50/40 p-3.5 space-y-2.5">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
-                      <Bot className="w-4 h-4 shrink-0 text-amber-600" />
-                      <p className="text-xs font-bold text-amber-950">
-                        Hóa đơn & Ảnh phiếu thu tự động
+                      <Sparkles className="w-4 h-4 shrink-0 text-emerald-600" />
+                      <p className="text-xs font-bold text-emerald-950">
+                        Hồ Sơ Hóa Đơn 4-trong-1
                       </p>
                     </div>
-                    <span className="inline-flex items-center gap-1 rounded-md bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">
+                    <span className="inline-flex items-center gap-1 rounded-md bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
                       <CheckCheck className="w-3 h-3 shrink-0" />
-                      Agent đã tạo
+                      Đã sẵn sàng
                     </span>
                   </div>
 
-                  <div className="flex items-center justify-between text-[11px] text-slate-600 bg-white p-2 rounded-xl border border-amber-100">
-                    <span className="flex items-center gap-1 font-semibold text-slate-700">
-                      <Zap className="w-3.5 h-3.5 shrink-0 text-rose-500" />
-                      Agent Thu Tiền Tự Động:
-                    </span>
-                    <span className="font-bold text-slate-800">
-                      {shown.reminderCount || 0} lần gửi Zalo
-                    </span>
+                  <div className="grid grid-cols-2 gap-1.5 text-[11px] text-slate-700">
+                    <div className="flex items-center gap-1.5 bg-white p-2 rounded-xl border border-emerald-100 shadow-2xs">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
+                      <span className="truncate">1. Tin nhắn chuẩn hóa</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 bg-white p-2 rounded-xl border border-emerald-100 shadow-2xs">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
+                      <span className="truncate">2. Mã VietQR động</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 bg-white p-2 rounded-xl border border-emerald-100 shadow-2xs">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
+                      <span className="truncate">3. Phiếu thu 2x Retina</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 bg-white p-2 rounded-xl border border-emerald-100 shadow-2xs">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
+                      <span className="truncate">4. Bảng Excel (.xlsx)</span>
+                    </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 pt-1">
+                  {/* Tùy chọn tải riêng lẻ */}
+                  <div className="flex items-center justify-end gap-2 pt-1 border-t border-emerald-100/60">
                     <button
                       type="button"
                       onClick={handleShareOrDownloadExcel}
-                      className="flex h-9 items-center justify-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-2.5 text-xs font-bold text-emerald-800 hover:bg-emerald-100 transition-colors shadow-2xs"
-                      title="Tải hoặc chia sẻ file Excel hóa đơn"
+                      className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 hover:underline"
+                      title="Tải riêng file Excel"
                     >
-                      {isNativeMobile() ? (
-                        <>
-                          <Share2 className="w-3.5 h-3.5 shrink-0 text-emerald-600" />
-                          <span>Gửi Zalo Excel (.xlsx)</span>
-                        </>
-                      ) : (
-                        <>
-                          <FileSpreadsheet className="w-3.5 h-3.5 shrink-0 text-emerald-600" />
-                          <span>Tải Excel HĐ (.xlsx)</span>
-                        </>
-                      )}
+                      <FileSpreadsheet className="w-3 h-3" />
+                      <span>Excel</span>
                     </button>
-
+                    <span className="text-slate-300">•</span>
                     <button
                       type="button"
                       onClick={() => onDownloadReceiptImage?.(shown)}
-                      className="flex h-9 items-center justify-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 px-2.5 text-xs font-bold text-amber-800 hover:bg-amber-100 transition-colors shadow-2xs"
-                      title="Tải ảnh phiếu thu PNG có dấu xác thực và mã VietQR"
+                      className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 hover:underline"
+                      title="Tải riêng ảnh phiếu thu PNG"
                     >
-                      <ImageIcon className="w-3.5 h-3.5 shrink-0 text-amber-600" />
-                      <span>Tải Ảnh Thu (PNG)</span>
+                      <ImageIcon className="w-3 h-3" />
+                      <span>Ảnh thu PNG</span>
                     </button>
                   </div>
                 </div>
               )}
             </div>
 
-            {/* Actions: Gửi Zalo kèm QR, Copy tin nhắn + QR, Xem phiếu thu */}
-            <div className="space-y-2 border-t border-slate-100 px-6 py-4">
-              <button
-                type="button"
-                disabled={isEmpty || !shown.phone}
-                onClick={() => {
-                  triggerHaptic("medium");
-                  onSendZaloMessage(shown);
-                }}
-                className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-sm font-bold text-white shadow-sm shadow-emerald-200 transition-all hover:opacity-95 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
-                title="Tự động sao chép tin nhắn kèm mã VietQR và mở Zalo gửi trực tiếp cho người thuê"
+            {/* Actions: Nút duy nhất nổi bật Gửi Hóa Đơn 4-trong-1 */}
+            <div className="space-y-2 border-t border-slate-100 px-6 py-4 bg-white/95 backdrop-blur-xs">
+              <TactileButton
+                variant="primary"
+                size="lg"
+                disabled={isEmpty || !shown.phone || isDispatching}
+                isLoading={isDispatching}
+                onClick={handleTriggerBundle4In1}
+                className="w-full text-sm font-bold shadow-md shadow-emerald-200/80 rounded-2xl h-12"
+                leftIcon={<Send className="w-4 h-4 shrink-0" />}
               >
-                <Send className="w-4 h-4 shrink-0" />
-                <span>Tự động gửi Zalo kèm mã QR</span>
-              </button>
+                <span>Gửi Hóa Đơn 4-trong-1</span>
+              </TactileButton>
 
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
+              <div className="grid grid-cols-2 gap-2 pt-0.5">
+                <TactileButton
+                  variant="outline"
+                  size="sm"
                   disabled={isEmpty}
                   onClick={() => {
                     triggerHaptic("light");
                     onCopyReminder(shown);
                   }}
-                  className="flex h-10 items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="text-xs font-semibold text-slate-700 rounded-xl"
+                  leftIcon={<Copy className="w-3.5 h-3.5 shrink-0 text-slate-500" />}
                   title="Sao chép tin nhắn đã tự động soạn kèm link ảnh mã QR"
                 >
-                  <Copy className="w-4 h-4 shrink-0" />
                   <span>Chép tin + QR</span>
-                </button>
+                </TactileButton>
 
-                <button
-                  type="button"
+                <TactileButton
+                  variant="outline"
+                  size="sm"
                   disabled={isEmpty}
                   onClick={() => {
                     triggerHaptic("light");
                     onOpenZalo(shown);
                   }}
-                  className="flex h-10 items-center justify-center gap-1.5 rounded-xl bg-[#0068FF] text-xs font-semibold text-white shadow-sm shadow-blue-200 transition-colors hover:bg-[#0058dc] disabled:cursor-not-allowed disabled:opacity-50"
+                  className="text-xs font-semibold text-[#0068FF] border-blue-200 hover:bg-blue-50/60 rounded-xl"
+                  leftIcon={<Smartphone className="w-3.5 h-3.5 shrink-0 text-[#0068FF]" />}
+                  title="Mở Zalo Mini App"
                 >
-                  <Smartphone className="w-4 h-4 shrink-0" />
                   <span>Phiếu thu Zalo</span>
-                </button>
+                </TactileButton>
               </div>
             </div>
           </>

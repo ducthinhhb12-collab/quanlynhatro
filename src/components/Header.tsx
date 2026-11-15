@@ -1,17 +1,19 @@
+import { useState, useRef } from "react";
 import {
   Building2,
   Download,
   Settings as SettingsIcon,
   BellRing,
   FileSpreadsheet,
-  MessageSquareWarning,
   Plus,
-  Bot,
-  Send,
   Users,
   Smartphone,
+  Shield,
+  MessageCircle,
 } from "lucide-react";
 import UploadBox from "./UploadBox";
+import { triggerHaptic } from "../utils/platformBridge";
+import { cn } from "../utils/cn";
 
 interface Props {
   unpaidCount: number;
@@ -19,38 +21,81 @@ interface Props {
   onUpload: (file: File) => void;
   onDownloadSample: () => void;
   onExportReport: () => void;
-  onOpenBatchReminder: () => void;
   onOpenAddRoom: () => void;
   onOpenCustomerManager?: () => void;
-  onOpenAgentCompany: () => void;
-  onAutoSendAllZalo: () => void;
   onSimulatePayment: () => void;
   onOpenSettings: () => void;
   onOpenMobileApp?: () => void;
+  onOpenAdmin: () => void;
+  onOpenZaloAuth: () => void;
+  isZaloConnected?: boolean;
+  zaloHostName?: string;
+  // Giữ lại các props cũ dưới dạng optional để tương thích ngược
+  onOpenBatchReminder?: () => void;
+  onOpenAgentCompany?: () => void;
+  onAutoSendAllZalo?: () => void;
 }
 
 export default function Header({
-  unpaidCount,
+  unpaidCount: _unpaidCount,
   tenantCount = 0,
   onUpload,
   onDownloadSample,
   onExportReport,
-  onOpenBatchReminder,
   onOpenAddRoom,
   onOpenCustomerManager,
-  onOpenAgentCompany,
-  onAutoSendAllZalo,
   onSimulatePayment,
   onOpenSettings,
   onOpenMobileApp,
+  onOpenAdmin,
+  onOpenZaloAuth,
+  isZaloConnected = false,
+  zaloHostName = "",
 }: Props) {
+  // Cử chỉ nhấn giữ 1.5s trên logo để mở stealth Admin Access
+  const timerRef = useRef<number | null>(null);
+  const [isPressingLogo, setIsPressingLogo] = useState(false);
+
+  const handleLogoPressStart = () => {
+    setIsPressingLogo(true);
+    timerRef.current = window.setTimeout(() => {
+      triggerHaptic("success");
+      setIsPressingLogo(false);
+      onOpenAdmin();
+    }, 1500);
+  };
+
+  const handleLogoPressEnd = () => {
+    if (timerRef.current) {
+      window.clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    setIsPressingLogo(false);
+  };
+
   return (
     <header className="fixed inset-x-0 top-0 z-40 flex h-[calc(60px+env(safe-area-inset-top,0px))] md:h-[72px] items-center justify-between gap-2 border-b border-slate-200 bg-white px-3 md:px-5 shadow-xs pt-[env(safe-area-inset-top,0px)]">
-      {/* Left: logo + title */}
+      {/* Left: Logo (nhấn giữ 1.5s mở Admin) + Tiêu đề */}
       <div className="flex min-w-0 items-center gap-2.5 md:gap-3">
-        <div className="flex h-9 w-9 md:h-10 md:w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-600 shadow-sm shadow-emerald-200">
+        <div
+          onMouseDown={handleLogoPressStart}
+          onMouseUp={handleLogoPressEnd}
+          onMouseLeave={handleLogoPressEnd}
+          onTouchStart={handleLogoPressStart}
+          onTouchEnd={handleLogoPressEnd}
+          onTouchCancel={handleLogoPressEnd}
+          title="Nhấn giữ 1.5s để mở Bảng Quản Trị Hệ Thống (Admin Stealth)"
+          className={cn(
+            "relative flex h-9 w-9 md:h-10 md:w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-600 shadow-sm shadow-emerald-200 cursor-pointer select-none transition-all",
+            isPressingLogo && "scale-95 ring-4 ring-amber-400 bg-emerald-700"
+          )}
+        >
           <Building2 className="w-4 h-4 md:w-5 md:h-5 shrink-0 text-white" />
+          {isPressingLogo && (
+            <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-amber-400 animate-ping" />
+          )}
         </div>
+
         <div className="min-w-0">
           <div className="flex items-center gap-1.5 md:gap-2">
             <h1 className="truncate text-sm md:text-[15px] font-black tracking-tight text-slate-900">
@@ -66,7 +111,7 @@ export default function Header({
         </div>
       </div>
 
-      {/* Center: upload + mẫu + xuất báo cáo (Desktop only) */}
+      {/* Center: Upload + Mẫu + Xuất báo cáo (Desktop only) */}
       <div className="hidden lg:flex flex-1 items-center justify-center gap-1.5">
         <UploadBox onFile={onUpload} />
         <button
@@ -90,38 +135,44 @@ export default function Header({
         </button>
       </div>
 
-      {/* Right: Actions */}
+      {/* Right: Actions Tối giản, không phân tán nút Agent */}
       <div className="flex shrink-0 items-center gap-1.5 md:gap-2">
-        {/* Nút Agent Tự Động Gửi Zalo Cho Khách Nợ */}
+        {/* Zalo Host Status Badge (Bấm để mở ZaloAuthModal) */}
         <button
           type="button"
-          onClick={onAutoSendAllZalo}
-          className="inline-flex h-8.5 md:h-10 items-center gap-1.5 md:gap-2 rounded-xl bg-gradient-to-r from-rose-600 via-rose-500 to-amber-500 px-2.5 md:px-3.5 text-xs font-bold text-white shadow-sm shadow-rose-200 transition-all hover:opacity-95 active:scale-[0.98]"
-          title="Cho Agent tự động gửi tin nhắn thu tiền kèm mã VietQR tới toàn bộ khách thuê đang nợ"
-        >
-          <Send className="w-3.5 h-3.5 md:w-4 md:h-4 shrink-0 text-white" />
-          <span className="hidden sm:inline">Agent Gửi Zalo</span>
-          <span className="sm:hidden">Zalo</span>
-          {unpaidCount > 0 && (
-            <span className="inline-flex h-4.5 min-w-4.5 md:h-5 md:min-w-5 items-center justify-center rounded-full bg-white/25 px-1 text-[10px] md:text-[11px] font-black text-white">
-              {unpaidCount}
-            </span>
+          onClick={() => {
+            triggerHaptic("light");
+            onOpenZaloAuth();
+          }}
+          title={
+            isZaloConnected
+              ? `Zalo Host: ${zaloHostName || "Đã xác thực"} (Bấm để quản lý phiên)`
+              : "Zalo Host: Chưa xác thực (Bấm để kết nối QR / Webhook)"
+          }
+          className={cn(
+            "inline-flex h-8.5 md:h-10 items-center gap-1.5 md:gap-2 rounded-xl px-2.5 md:px-3 text-xs font-bold transition-all active:scale-95 border shadow-2xs",
+            isZaloConnected
+              ? "bg-blue-50/90 border-blue-200 text-blue-700 hover:bg-blue-100"
+              : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100 hover:border-slate-300"
           )}
-        </button>
-
-        {/* Nút Công ty AI Agent Điều hành (Desktop/Tablet) */}
-        <button
-          type="button"
-          onClick={onOpenAgentCompany}
-          className="hidden sm:inline-flex h-10 items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-700 to-violet-600 px-3 text-xs font-bold text-white shadow-sm shadow-indigo-200 transition-all hover:opacity-95 active:scale-[0.98]"
-          title="Mở bảng điều khiển 6 AI Agents tự động điều hành tòa nhà"
         >
-          <Bot className="w-4 h-4 shrink-0 text-indigo-200" />
-          <span>Công ty Agent</span>
-          <span className="relative flex h-2 w-2">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400"></span>
-          </span>
+          <div className="relative flex items-center justify-center">
+            <MessageCircle className="w-3.5 h-3.5 md:w-4 md:h-4 text-[#0068FF] shrink-0" />
+            <span
+              className={cn(
+                "absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full ring-2 ring-white",
+                isZaloConnected ? "bg-emerald-500 animate-pulse" : "bg-amber-400"
+              )}
+            />
+          </div>
+          <div className="flex flex-col text-left leading-tight">
+            <span className="text-[9px] text-slate-400 font-semibold hidden md:block">
+              Zalo Host
+            </span>
+            <span className="text-xs font-bold truncate max-w-[90px] sm:max-w-[120px]">
+              {isZaloConnected ? (zaloHostName || "Đã xác thực") : "Chưa kết nối"}
+            </span>
+          </div>
         </button>
 
         {/* Nút Thêm phòng (Desktop) */}
@@ -151,17 +202,6 @@ export default function Header({
           </button>
         )}
 
-        {/* Nút Nhắc nợ Zalo (Desktop) */}
-        <button
-          type="button"
-          onClick={onOpenBatchReminder}
-          className="hidden lg:inline-flex h-10 items-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 px-3 text-xs font-bold text-amber-800 transition-colors hover:bg-amber-100 active:scale-[0.98]"
-          title="Mở danh sách và sao chép tin nhắc nợ hàng loạt"
-        >
-          <MessageSquareWarning className="w-4 h-4 shrink-0 text-amber-600" />
-          <span>Nhắc nợ Zalo</span>
-        </button>
-
         {/* Nút Ting ting (hiện trên cả Mobile & Desktop) */}
         <button
           type="button"
@@ -178,14 +218,26 @@ export default function Header({
           <button
             type="button"
             onClick={onOpenMobileApp}
-            className="inline-flex h-8.5 md:h-10 items-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50/90 px-2.5 md:px-3.5 text-xs font-bold text-emerald-800 shadow-2xs transition-all hover:bg-emerald-100 active:scale-[0.98]"
+            className="inline-flex h-8.5 md:h-10 items-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50/90 px-2.5 md:px-3 text-xs font-bold text-emerald-800 shadow-2xs transition-all hover:bg-emerald-100 active:scale-[0.98]"
             title="Lấy mã QR & link tải trực tiếp file .apk cho Android hoặc .ipa cho iOS để chạy độc lập"
           >
             <Smartphone className="w-3.5 h-3.5 md:w-4 md:h-4 shrink-0 text-emerald-600" />
-            <span className="hidden sm:inline">Tải App Điện Thoại</span>
-            <span className="sm:hidden">Tải App</span>
+            <span className="hidden sm:inline">Tải App</span>
           </button>
         )}
+
+        {/* Stealth Admin Access Button (Shield Icon) */}
+        <button
+          type="button"
+          onClick={() => {
+            triggerHaptic("light");
+            onOpenAdmin();
+          }}
+          title="Quản trị hệ thống & Master Autopilot 24/7 (Bảo vệ bằng PIN)"
+          className="flex h-8.5 md:h-10 w-8.5 md:w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 hover:text-amber-600 hover:border-amber-300 hover:bg-amber-50/60 transition-colors shadow-2xs active:scale-95"
+        >
+          <Shield className="w-4 h-4 md:w-4.5 md:h-4.5" />
+        </button>
 
         {/* Nút Cài đặt (Desktop) */}
         <button

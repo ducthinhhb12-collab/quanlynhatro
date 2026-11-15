@@ -30,7 +30,6 @@ export default function MobileDownloadModal({ onClose }: Props) {
   const githubRepoUrl = "https://github.com/ducthinhhb12-collab/quanlynhatro";
   const directApkUrl = `${githubRepoUrl}/releases/download/v1.0.1/AnGiaSmartHome3D-release.apk`;
   const directIpaUrl = `${githubRepoUrl}/releases/download/v1.0.1/AnGiaSmartHome3D.ipa`;
-  const releasesPageUrl = `${githubRepoUrl}/releases/latest`;
   const iosAppUrl = "https://ducthinhhb12-collab.github.io/quanlynhatro/";
 
   // QR Code tải trực tiếp file APK tạo cục bộ (100% offline không cần API bên ngoài)

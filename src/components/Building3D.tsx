@@ -106,7 +106,7 @@ function RoomBlock({
         </mesh>
 
         {/* Nhãn phòng dạng 3D HTML Badge */}
-        <Html position={[0, ROOM_H * 0.55, ROOM_D / 2 + 0.02]} center transform sprite portal={portalRef}>
+        <Html position={[0, ROOM_H * 0.55, ROOM_D / 2 + 0.02]} center transform sprite portal={portalRef as any}>
           <div
             onClick={(e) => {
               e.stopPropagation();
@@ -209,7 +209,7 @@ function BuildingScene({
           const labelX = -(slabW / 2 + 1.35);
           const labelY = (floorNum - 1) * FLOOR_STEP + 0.55;
           return (
-            <Html key={`floor-lbl-${floorNum}`} position={[labelX, labelY, 0]} center portal={portalRef}>
+            <Html key={`floor-lbl-${floorNum}`} position={[labelX, labelY, 0]} center portal={portalRef as any}>
               <div
                 className={cn(
                   "pointer-events-none whitespace-nowrap text-[10px] font-extrabold tracking-[0.2em] transition-colors",

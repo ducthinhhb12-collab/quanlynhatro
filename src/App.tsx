@@ -13,6 +13,11 @@ import SettingsModal from "./components/SettingsModal";
 import AutoZaloSenderModal from "./components/AutoZaloSenderModal";
 import CustomerManagerModal from "./components/CustomerManagerModal";
 import MobileDownloadModal from "./components/MobileDownloadModal";
+import AdminControlModal, {
+  DEFAULT_ADMIN_SETTINGS,
+  STORAGE_KEY_ADMIN_SETTINGS,
+} from "./components/AdminControlModal";
+import ZaloAuthModal from "./components/ZaloAuthModal";
 import BottomNavBar, { type MobileTab } from "./components/BottomNavBar";
 import Toast from "./components/Toast";
 import { cn } from "./utils/cn";
@@ -41,6 +46,15 @@ import {
   downloadRoomInvoiceExcel,
   downloadInvoiceImage,
 } from "./utils/invoiceGenerator";
+import {
+  getStoredZaloHostSession,
+  subscribeZaloSessionChange,
+  isZaloHostAuthorized,
+} from "./utils/zaloSession";
+import {
+  buildRoomInvoiceBundle4In1,
+  dispatchBundle4In1,
+} from "./utils/dispatchBundle4In1";
 import type {
   AgentInfo,
   AgentLog,
@@ -49,8 +63,8 @@ import type {
   Settings,
   ToastState,
 } from "./types";
+import type { AdminSettings, ZaloHostSession, AgentLogEntry } from "./types/swarmContracts";
 
-const DRAWER_WIDTH = 410; // w-[410px]
 const STORAGE_KEY_ROOMS = "an_gia_smart_home_rooms_v3";
 const STORAGE_KEY_SETTINGS = "an_gia_smart_home_settings_v3";
 const STORAGE_KEY_AGENTS = "an_gia_smart_home_agents_v3";
@@ -125,7 +139,49 @@ export default function App() {
   });
 
   const [agentLogs, setAgentLogs] = useState<AgentLog[]>(INITIAL_AGENT_LOGS);
-  const [autopilot, setAutopilot] = useState<boolean>(true);
+
+  // Cấu hình Quản Trị Bảo Mật & Master Autopilot
+  const [adminSettings, setAdminSettings] = useState<AdminSettings>(() => {
+    if (typeof window === "undefined") return DEFAULT_ADMIN_SETTINGS;
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_ADMIN_SETTINGS);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed === "object") {
+          return { ...DEFAULT_ADMIN_SETTINGS, ...parsed };
+        }
+      }
+    } catch {
+      // ignore
+    }
+    return DEFAULT_ADMIN_SETTINGS;
+  });
+
+  const [autopilot, setAutopilot] = useState<boolean>(() => adminSettings.autopilotEnabled);
+
+  // Đồng bộ Autopilot với AdminSettings
+  useEffect(() => {
+    setAutopilot(adminSettings.autopilotEnabled);
+  }, [adminSettings.autopilotEnabled]);
+
+  // Lưu trữ cấu hình AdminSettings
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY_ADMIN_SETTINGS, JSON.stringify(adminSettings));
+    } catch {
+      // ignore
+    }
+  }, [adminSettings]);
+
+  // Quản lý phiên Zalo Host chính chủ
+  const [zaloSession, setZaloSession] = useState<ZaloHostSession>(() => getStoredZaloHostSession());
+
+  useEffect(() => {
+    const unsub = subscribeZaloSessionChange((s) => {
+      setZaloSession(s);
+    });
+    return () => unsub();
+  }, []);
 
   // Tự động lưu trữ localStorage
   useEffect(() => {
@@ -159,6 +215,8 @@ export default function App() {
   const [filterStatus, setFilterStatus] = useState<RoomStatus | null>(null);
 
   // Modals
+  const [adminModalOpen, setAdminModalOpen] = useState(false);
+  const [zaloAuthModalOpen, setZaloAuthModalOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [addRoomOpen, setAddRoomOpen] = useState(false);
   const [agentCompanyOpen, setAgentCompanyOpen] = useState(false);
@@ -182,7 +240,11 @@ export default function App() {
     let listenerPromise: Promise<any> | null = null;
     try {
       listenerPromise = CapApp.addListener("backButton", () => {
-        if (customerManagerOpen) {
+        if (adminModalOpen) {
+          setAdminModalOpen(false);
+        } else if (zaloAuthModalOpen) {
+          setZaloAuthModalOpen(false);
+        } else if (customerManagerOpen) {
           setCustomerManagerOpen(false);
           setMobileTab("3d");
         } else if (autoZaloSenderOpen) {
@@ -216,6 +278,8 @@ export default function App() {
       }
     };
   }, [
+    adminModalOpen,
+    zaloAuthModalOpen,
     customerManagerOpen,
     autoZaloSenderOpen,
     agentCompanyOpen,
@@ -271,7 +335,9 @@ export default function App() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
-      if (mobileAppQrOpen) setMobileAppQrOpen(false);
+      if (adminModalOpen) setAdminModalOpen(false);
+      else if (zaloAuthModalOpen) setZaloAuthModalOpen(false);
+      else if (mobileAppQrOpen) setMobileAppQrOpen(false);
       else if (autoZaloSenderOpen) setAutoZaloSenderOpen(false);
       else if (agentCompanyOpen) setAgentCompanyOpen(false);
       else if (addRoomOpen) setAddRoomOpen(false);
@@ -282,7 +348,7 @@ export default function App() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [autoZaloSenderOpen, agentCompanyOpen, addRoomOpen, batchReminderOpen, zaloOpen, settingsOpen, selectedId]);
+  }, [adminModalOpen, zaloAuthModalOpen, autoZaloSenderOpen, agentCompanyOpen, addRoomOpen, batchReminderOpen, zaloOpen, settingsOpen, selectedId, mobileAppQrOpen]);
 
   /* ---------- AUTOPILOT AGENTS: TỰ ĐỘNG CHẠY NGẦM ---------- */
   useEffect(() => {
@@ -858,6 +924,110 @@ export default function App() {
     showToast("Đã khôi phục dữ liệu mẫu 12 phòng ban đầu", "info");
   };
 
+  // Cập nhật cấu hình Quản Trị Viên & Master Autopilot
+  const handleUpdateAdminSettings = (updates: Partial<AdminSettings>) => {
+    setAdminSettings((prev) => {
+      const next = { ...prev, ...updates };
+      if (updates.autopilotEnabled !== undefined) {
+        setAutopilot(updates.autopilotEnabled);
+      }
+      return next;
+    });
+  };
+
+  // Điều phối Gói Hóa Đơn Đa Phương Tiện 4-trong-1 (Worker 3)
+  const handleDispatchBundle4In1 = async (room: Room) => {
+    try {
+      showToast(`Đang kết xuất Gói Hóa Đơn 4-trong-1 phòng ${room.id}...`, "info");
+      const bundle = await buildRoomInvoiceBundle4In1(room, settings, zaloSession);
+      const res = await dispatchBundle4In1(bundle, { hostSession: zaloSession });
+
+      const nowStr = `${new Date().toLocaleDateString("vi-VN")} ${getNowTimeStr()}`;
+      setRooms((curr) =>
+        curr.map((r) =>
+          r.id === room.id
+            ? {
+                ...r,
+                zaloSendStatus: "SENT",
+                lastZaloSentAt: nowStr,
+                lastAutoSentAt: nowStr,
+                reminderCount: (r.reminderCount || 0) + 1,
+                hasExcelInvoice: true,
+                hasImageInvoice: true,
+                invoiceIssued: true,
+              }
+            : r
+        )
+      );
+
+      addAgentLog(
+        "DOCUMENT_GEN",
+        "Gói Hóa Đơn 4-trong-1",
+        `Đã phát hành trọn gói 4 món (Tin nhắn, VietQR, Phiếu thu 2x Retina, Excel) cho phòng ${room.id} (${room.tenant}).`,
+        "success"
+      );
+
+      if (res.success) {
+        showToast(res.message || `Đã gửi trọn gói 4-trong-1 phòng ${room.id}!`, "success");
+      } else {
+        showToast(res.message || "Không thể gửi trọn gói", "error");
+      }
+    } catch (err: any) {
+      console.error("Lỗi gửi 4-trong-1:", err);
+      showToast(`Lỗi xử lý: ${err?.message || "Không xác định"}`, "error");
+    }
+  };
+
+  // Chạy thu nợ hàng loạt cho tất cả các phòng quá hạn (Admin batch run)
+  const handleRunBatchOverdue = async () => {
+    const overdueList = rooms.filter(
+      (r) => (r.status === "OVERDUE" || r.status === "PENDING") && r.phone
+    );
+
+    if (overdueList.length === 0) {
+      showToast("Không có phòng nào đang quá hạn cần gửi thu tiền!", "info");
+      return;
+    }
+
+    showToast(`Đang lập và gửi trọn gói 4-trong-1 cho ${overdueList.length} phòng nợ...`, "info");
+
+    for (const r of overdueList) {
+      try {
+        const bundle = await buildRoomInvoiceBundle4In1(r, settings, zaloSession);
+        await dispatchBundle4In1(bundle, { openZalo: false, hostSession: zaloSession });
+
+        const nowStr = `${new Date().toLocaleDateString("vi-VN")} ${getNowTimeStr()}`;
+        setRooms((curr) =>
+          curr.map((item) =>
+            item.id === r.id
+              ? {
+                  ...item,
+                  zaloSendStatus: "SENT",
+                  lastZaloSentAt: nowStr,
+                  lastAutoSentAt: nowStr,
+                  reminderCount: (item.reminderCount || 0) + 1,
+                  hasExcelInvoice: true,
+                  hasImageInvoice: true,
+                  invoiceIssued: true,
+                }
+              : item
+          )
+        );
+
+        addAgentLog(
+          "AUTO_COLLECTOR",
+          "Thu Nợ Hàng Loạt",
+          `[ADMIN BATCH] Đã lập hồ sơ 4-trong-1 phòng ${r.id} (${r.tenant} - ${r.phone}).`,
+          "action"
+        );
+      } catch (err) {
+        console.warn("Lỗi gửi batch phòng", r.id, err);
+      }
+    }
+
+    showToast(`Đã hoàn tất xử lý hàng loạt ${overdueList.length} phòng nợ!`, "success");
+  };
+
   const closeDrawer = () => {
     setSelectedId(null);
     if (mobileTab === "rooms") setMobileTab("3d");
@@ -910,16 +1080,10 @@ export default function App() {
         onUpload={handleUpload}
         onDownloadSample={handleDownloadSample}
         onExportReport={handleExportReport}
-        onOpenBatchReminder={() => setBatchReminderOpen(true)}
         onOpenAddRoom={() => setAddRoomOpen(true)}
         onOpenCustomerManager={() => {
           setCustomerManagerOpen(true);
           setMobileTab("customers");
-        }}
-        onOpenAgentCompany={() => setAgentCompanyOpen(true)}
-        onAutoSendAllZalo={() => {
-          setAutoZaloSenderOpen(true);
-          setMobileTab("zalo");
         }}
         onSimulatePayment={handleSimulatePayment}
         onOpenSettings={() => {
@@ -927,6 +1091,10 @@ export default function App() {
           setMobileTab("settings");
         }}
         onOpenMobileApp={() => setMobileAppQrOpen(true)}
+        onOpenAdmin={() => setAdminModalOpen(true)}
+        onOpenZaloAuth={() => setZaloAuthModalOpen(true)}
+        isZaloConnected={isZaloHostAuthorized(zaloSession)}
+        zaloHostName={zaloSession.hostName}
       />
 
       <main className="relative flex-1 w-full overflow-hidden bg-slate-50 mt-[64px] md:mt-[72px] pb-[calc(64px+env(safe-area-inset-bottom,0px))] md:pb-0">
@@ -951,6 +1119,8 @@ export default function App() {
             }}
             isLocked={
               !!selectedId ||
+              adminModalOpen ||
+              zaloAuthModalOpen ||
               settingsOpen ||
               addRoomOpen ||
               zaloOpen ||
@@ -998,12 +1168,11 @@ export default function App() {
           <span>Kéo xoay 3D • Cuộn phóng to • Bấm chọn phòng</span>
         </div>
 
-        {/* Chú thích trạng thái & 4 huy hiệu phòng ban */}
+        {/* Chú thích trạng thái & bộ lọc */}
         <Legend
           counts={counts}
           filterStatus={filterStatus}
           onToggleFilterStatus={handleToggleFilterStatus}
-          onOpenAgentCompany={() => setAgentCompanyOpen(true)}
         />
       </main>
 
@@ -1025,6 +1194,7 @@ export default function App() {
         onDownloadReceiptImage={handleDownloadReceiptImage}
         onRemoveTenant={handleRemoveTenant}
         onDeleteRoom={handleDeleteRoom}
+        onDispatchBundle4In1={handleDispatchBundle4In1}
       />
 
       {/* Modal Zalo Mini App */}
@@ -1169,6 +1339,26 @@ export default function App() {
       {mobileAppQrOpen && (
         <MobileDownloadModal onClose={() => setMobileAppQrOpen(false)} />
       )}
+
+      {/* Modal Bảng Quản Trị Hệ Thống & Master Autopilot 24/7 (Admin) */}
+      <AdminControlModal
+        isOpen={adminModalOpen}
+        onClose={() => setAdminModalOpen(false)}
+        adminSettings={adminSettings}
+        onUpdateAdminSettings={handleUpdateAdminSettings}
+        logs={agentLogs as unknown as AgentLogEntry[]}
+        onClearLogs={() => setAgentLogs([])}
+        onRunBatchOverdue={handleRunBatchOverdue}
+        overdueRooms={rooms.filter((r) => r.status === "OVERDUE")}
+        onShowToast={showToast}
+      />
+
+      {/* Modal Xác Thực & Quản Lý Phiên Zalo Chủ Nhà */}
+      <ZaloAuthModal
+        isOpen={zaloAuthModalOpen}
+        onClose={() => setZaloAuthModalOpen(false)}
+        onSessionChange={(s) => setZaloSession(s)}
+      />
 
       {/* Thanh điều hướng đáy Native cho Mobile */}
       <BottomNavBar
