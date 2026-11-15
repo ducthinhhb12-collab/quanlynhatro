@@ -237,7 +237,7 @@ export default function CustomerManagerModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/60 p-0 sm:p-4 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
@@ -245,34 +245,37 @@ export default function CustomerManagerModal({
         aria-modal="true"
         aria-label="Quản lý khách hàng & khách thuê"
         onClick={(e) => e.stopPropagation()}
-        className="flex max-h-[92vh] w-full max-w-5xl flex-col rounded-3xl bg-white shadow-2xl overflow-hidden border border-slate-100"
+        className="flex max-h-[92dvh] w-full max-w-5xl flex-col rounded-t-3xl sm:rounded-3xl bg-white shadow-2xl overflow-hidden border border-slate-100 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] sm:pb-0"
       >
+        {/* Mobile Drag Handle */}
+        <div className="sm:hidden w-12 h-1.5 bg-slate-500/50 rounded-full mx-auto my-2 shrink-0" />
+
         {/* Header */}
-        <div className="flex items-start justify-between border-b border-slate-100 p-5 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white">
+        <div className="flex items-start justify-between border-b border-slate-100 p-4 sm:p-5 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white">
           <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-md shadow-indigo-900/40">
-              <Users className="w-6 h-6 shrink-0" />
+            <div className="flex h-11 w-11 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-md shadow-indigo-900/40">
+              <Users className="w-5 h-5 sm:w-6 sm:h-6 shrink-0" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-lg font-black tracking-tight text-white">
-                  Quản Lý Khách Hàng & Danh Bạ Khách Thuê
+                <h2 className="text-base sm:text-lg font-black tracking-tight text-white">
+                  Quản Lý Khách Hàng & Danh Bạ
                 </h2>
-                <span className="rounded-full bg-indigo-500/20 px-2.5 py-0.5 text-[10px] font-bold text-indigo-300 ring-1 ring-indigo-500/40">
-                  {roomsWithTenant.length}/{totalRooms} phòng có khách
+                <span className="rounded-full bg-indigo-500/20 px-2 py-0.5 text-[10px] font-bold text-indigo-300 ring-1 ring-indigo-500/40">
+                  {roomsWithTenant.length}/{totalRooms} phòng
                 </span>
               </div>
-              <p className="mt-0.5 text-xs text-slate-300">
-                Thêm khách thuê mới vào phòng trống, chỉnh sửa thông tin Zalo / CCCD và xóa khách trả phòng
+              <p className="mt-0.5 text-xs text-slate-300 line-clamp-1 sm:line-clamp-none">
+                Thêm khách thuê mới vào phòng trống, chỉnh sửa Zalo / CCCD và xóa khách trả phòng
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             <button
               type="button"
               onClick={handleExportCustomersExcel}
-              className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-white/20 bg-white/10 px-3 text-xs font-bold text-white shadow-xs backdrop-blur-sm hover:bg-white/20 active:scale-95"
+              className="hidden sm:inline-flex min-h-[38px] items-center gap-1.5 rounded-xl border border-white/20 bg-white/10 px-3 text-xs font-bold text-white shadow-xs backdrop-blur-sm hover:bg-white/20 active:scale-95"
               title="Xuất toàn bộ danh bạ khách thuê ra file Excel"
             >
               <FileSpreadsheet className="w-3.5 h-3.5 shrink-0 text-emerald-300" />
@@ -282,17 +285,18 @@ export default function CustomerManagerModal({
             <button
               type="button"
               onClick={() => handleOpenAdd()}
-              className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-3.5 text-xs font-bold text-white shadow-sm hover:opacity-95 active:scale-95"
+              className="inline-flex min-h-[40px] items-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-3 sm:px-3.5 text-xs font-bold text-white shadow-sm hover:opacity-95 active:scale-95"
             >
               <UserPlus className="w-3.5 h-3.5 shrink-0" />
-              <span>+ Thêm Khách Mới</span>
+              <span className="hidden sm:inline">+ Thêm Khách Mới</span>
+              <span className="sm:hidden">+ Thêm</span>
             </button>
 
             <button
               type="button"
               onClick={onClose}
               aria-label="Đóng"
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-white/10 hover:text-white"
+              className="flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-xl text-slate-300 hover:bg-white/10 hover:text-white active:scale-95 transition-all"
             >
               <X className="w-4 h-4 shrink-0" />
             </button>

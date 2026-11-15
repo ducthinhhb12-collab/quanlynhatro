@@ -12,6 +12,7 @@ import { Color, MathUtils, TOUCH, type Group, type MeshStandardMaterial } from "
 import type { Room, RoomStatus, Settings } from "../types";
 import { STATUS_META, formatVND, roomTotal } from "../utils/format";
 import { cn } from "../utils/cn";
+import { triggerHaptic } from "../utils/platformBridge";
 
 /* ---------- Kích thước & bố cục (đơn vị 3D) ---------- */
 const ROOM_W = 1.6; // chiều ngang phòng (trục X)
@@ -306,18 +307,21 @@ export default function Building3D({
   return (
     <div ref={containerRef} className={cn("relative h-full w-full", isLocked && "pointer-events-none")}>
       {/* Thanh chọn nhanh tầng ở góc trên bên phải vùng 3D */}
-      <div className="pointer-events-auto absolute right-3 md:right-5 top-3 md:top-5 z-20 flex items-center gap-1 rounded-2xl border border-slate-200/90 bg-white/95 p-1 shadow-md backdrop-blur">
-        <span className="flex items-center gap-1 pl-2 pr-1 text-xs font-semibold text-slate-500">
+      <div className="pointer-events-auto absolute right-2.5 sm:right-5 top-2.5 sm:top-5 z-20 flex items-center gap-1.5 rounded-2xl border border-slate-200/90 bg-white/95 p-1.5 shadow-md backdrop-blur">
+        <span className="flex items-center gap-1 pl-1.5 pr-1 text-xs font-semibold text-slate-500">
           <Layers className="w-3.5 h-3.5 shrink-0 text-slate-400" />
           <span className="hidden sm:inline">Tầng:</span>
         </span>
         <button
           type="button"
-          onClick={() => onSelectFloor(0)}
+          onClick={() => {
+            triggerHaptic("light");
+            onSelectFloor(0);
+          }}
           className={cn(
-            "rounded-xl px-2.5 py-1 text-xs font-bold transition-all",
+            "min-h-[44px] min-w-[44px] md:min-h-[36px] md:min-w-[36px] px-2.5 py-1 flex items-center justify-center rounded-xl text-xs font-bold transition-all active:scale-95 select-none",
             selectedFloor === 0
-              ? "bg-slate-900 text-white shadow-sm"
+              ? "bg-slate-900 text-white shadow-sm ring-1 ring-slate-900"
               : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
           )}
         >
@@ -327,11 +331,14 @@ export default function Building3D({
           <button
             key={f}
             type="button"
-            onClick={() => onSelectFloor(f)}
+            onClick={() => {
+              triggerHaptic("light");
+              onSelectFloor(f);
+            }}
             className={cn(
-              "rounded-xl px-2.5 py-1 text-xs font-bold transition-all",
+              "min-h-[44px] min-w-[44px] md:min-h-[36px] md:min-w-[36px] px-2 py-1 flex items-center justify-center rounded-xl text-xs font-bold transition-all active:scale-95 select-none",
               selectedFloor === f
-                ? "bg-slate-900 text-white shadow-sm"
+                ? "bg-slate-900 text-white shadow-sm ring-1 ring-slate-900"
                 : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
             )}
           >

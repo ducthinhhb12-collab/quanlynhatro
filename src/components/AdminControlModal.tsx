@@ -313,7 +313,7 @@ export default function AdminControlModal({
             <button
               type="button"
               onClick={onClose}
-              className="flex h-8 w-8 items-center justify-center rounded-xl text-slate-400 hover:bg-slate-200 hover:text-slate-700 transition-colors"
+              className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl text-slate-400 hover:bg-slate-200 hover:text-slate-700 active:scale-95 transition-all"
             >
               <X className="w-5 h-5" />
             </button>

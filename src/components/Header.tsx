@@ -150,14 +150,14 @@ export default function Header({
               : "Zalo Host: Chưa xác thực (Bấm để kết nối QR / Webhook)"
           }
           className={cn(
-            "inline-flex h-8.5 md:h-10 items-center gap-1.5 md:gap-2 rounded-xl px-2.5 md:px-3 text-xs font-bold transition-all active:scale-95 border shadow-2xs",
+            "inline-flex min-h-[44px] md:h-10 items-center gap-1.5 md:gap-2 rounded-xl px-2.5 md:px-3 text-xs font-bold transition-all active:scale-[0.96] border shadow-2xs select-none",
             isZaloConnected
               ? "bg-blue-50/90 border-blue-200 text-blue-700 hover:bg-blue-100"
               : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100 hover:border-slate-300"
           )}
         >
           <div className="relative flex items-center justify-center">
-            <MessageCircle className="w-3.5 h-3.5 md:w-4 md:h-4 text-[#0068FF] shrink-0" />
+            <MessageCircle className="w-4 h-4 md:w-4.5 md:h-4.5 text-[#0068FF] shrink-0" />
             <span
               className={cn(
                 "absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full ring-2 ring-white",
@@ -169,7 +169,7 @@ export default function Header({
             <span className="text-[9px] text-slate-400 font-semibold hidden md:block">
               Zalo Host
             </span>
-            <span className="text-xs font-bold truncate max-w-[90px] sm:max-w-[120px]">
+            <span className="text-xs font-bold truncate max-w-[85px] sm:max-w-[120px]">
               {isZaloConnected ? (zaloHostName || "Đã xác thực") : "Chưa kết nối"}
             </span>
           </div>
@@ -205,11 +205,14 @@ export default function Header({
         {/* Nút Ting ting (hiện trên cả Mobile & Desktop) */}
         <button
           type="button"
-          onClick={onSimulatePayment}
-          className="inline-flex h-8.5 md:h-10 items-center gap-1.5 rounded-xl bg-emerald-600 px-2.5 md:px-3 text-xs font-bold text-white shadow-sm shadow-emerald-200 transition-colors hover:bg-emerald-700 active:scale-[0.98]"
+          onClick={() => {
+            triggerHaptic("success");
+            onSimulatePayment();
+          }}
+          className="inline-flex min-h-[44px] md:h-10 items-center gap-1.5 rounded-xl bg-emerald-600 px-3 md:px-3 text-xs font-bold text-white shadow-sm shadow-emerald-200 transition-all hover:bg-emerald-700 active:scale-[0.96] select-none"
           title="Giả lập nhận tiền chuyển khoản VietQR"
         >
-          <BellRing className="w-3.5 h-3.5 md:w-4 md:h-4 shrink-0" />
+          <BellRing className="w-4 h-4 shrink-0" />
           <span className="hidden sm:inline">Ting ting</span>
         </button>
 
@@ -217,11 +220,14 @@ export default function Header({
         {onOpenMobileApp && (
           <button
             type="button"
-            onClick={onOpenMobileApp}
-            className="inline-flex h-8.5 md:h-10 items-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50/90 px-2.5 md:px-3 text-xs font-bold text-emerald-800 shadow-2xs transition-all hover:bg-emerald-100 active:scale-[0.98]"
+            onClick={() => {
+              triggerHaptic("light");
+              onOpenMobileApp();
+            }}
+            className="inline-flex min-h-[44px] md:h-10 items-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50/90 px-3 md:px-3 text-xs font-bold text-emerald-800 shadow-2xs transition-all hover:bg-emerald-100 active:scale-[0.96] select-none"
             title="Lấy mã QR & link tải trực tiếp file .apk cho Android hoặc .ipa cho iOS để chạy độc lập"
           >
-            <Smartphone className="w-3.5 h-3.5 md:w-4 md:h-4 shrink-0 text-emerald-600" />
+            <Smartphone className="w-4 h-4 shrink-0 text-emerald-600" />
             <span className="hidden sm:inline">Tải App</span>
           </button>
         )}
@@ -234,9 +240,9 @@ export default function Header({
             onOpenAdmin();
           }}
           title="Quản trị hệ thống & Master Autopilot 24/7 (Bảo vệ bằng PIN)"
-          className="flex h-8.5 md:h-10 w-8.5 md:w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 hover:text-amber-600 hover:border-amber-300 hover:bg-amber-50/60 transition-colors shadow-2xs active:scale-95"
+          className="flex min-h-[44px] min-w-[44px] md:h-10 md:w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 hover:text-amber-600 hover:border-amber-300 hover:bg-amber-50/60 transition-all shadow-2xs active:scale-[0.96] select-none"
         >
-          <Shield className="w-4 h-4 md:w-4.5 md:h-4.5" />
+          <Shield className="w-4.5 h-4.5" />
         </button>
 
         {/* Nút Cài đặt (Desktop) */}

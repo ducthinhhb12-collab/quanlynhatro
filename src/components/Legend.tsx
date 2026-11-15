@@ -2,6 +2,7 @@ import { Filter, X } from "lucide-react";
 import { STATUS_META } from "../utils/format";
 import type { RoomStatus } from "../types";
 import { cn } from "../utils/cn";
+import { triggerHaptic } from "../utils/platformBridge";
 
 interface Props {
   counts: Record<RoomStatus, number>;
@@ -18,9 +19,9 @@ export default function Legend({
   onToggleFilterStatus,
 }: Props) {
   return (
-    <div className="pointer-events-none absolute bottom-5 left-5 z-10 flex flex-col items-start gap-3">
+    <div className="pointer-events-none absolute bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] md:bottom-5 left-3 md:left-5 z-20 flex flex-col items-start gap-3">
       {/* Khối chú thích trạng thái & bộ lọc trực tiếp trên 3D */}
-      <div className="pointer-events-auto w-72 rounded-2xl border border-slate-200/90 bg-white/95 p-3.5 shadow-lg shadow-slate-200/60 backdrop-blur">
+      <div className="pointer-events-auto w-[260px] sm:w-72 rounded-2xl border border-slate-200/90 bg-white/95 p-3 shadow-lg shadow-slate-200/60 backdrop-blur">
         <div className="mb-2 flex items-center justify-between">
           <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-400">
             <Filter className="w-3.5 h-3.5 shrink-0 text-slate-400" />
@@ -29,12 +30,15 @@ export default function Legend({
           {filterStatus && (
             <button
               type="button"
-              onClick={() => onToggleFilterStatus(filterStatus)}
-              className="flex items-center gap-1 text-[10px] font-semibold text-rose-500 hover:text-rose-700"
+              onClick={() => {
+                triggerHaptic("light");
+                onToggleFilterStatus(filterStatus);
+              }}
+              className="flex min-h-[32px] items-center gap-1 text-[11px] font-semibold text-rose-500 hover:text-rose-700 active:scale-95 px-1.5 rounded-lg"
               title="Bỏ lọc"
             >
               <span>Xóa lọc</span>
-              <X className="w-3 h-3 shrink-0" />
+              <X className="w-3.5 h-3.5 shrink-0" />
             </button>
           )}
         </div>
@@ -46,11 +50,14 @@ export default function Legend({
               <button
                 key={s}
                 type="button"
-                onClick={() => onToggleFilterStatus(s)}
+                onClick={() => {
+                  triggerHaptic("light");
+                  onToggleFilterStatus(s);
+                }}
                 className={cn(
-                  "flex items-center gap-2 rounded-xl border px-2.5 py-1.5 text-left text-xs transition-all",
+                  "flex min-h-[44px] items-center gap-2 rounded-xl border px-2.5 py-1.5 text-left text-xs transition-all active:scale-[0.96] duration-150 select-none",
                   isSelected
-                    ? "border-slate-900 bg-slate-900 text-white shadow-sm"
+                    ? "border-slate-900 bg-slate-900 text-white shadow-sm ring-1 ring-slate-900"
                     : "border-slate-100 bg-slate-50/70 text-slate-700 hover:border-slate-200 hover:bg-slate-100/80"
                 )}
                 title={`Nhấn để làm nổi bật phòng ${STATUS_META[s].label}`}

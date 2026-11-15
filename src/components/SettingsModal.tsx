@@ -46,15 +46,18 @@ export default function SettingsModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/60 p-0 sm:p-4 backdrop-blur-sm">
       <form
         onSubmit={submit}
-        className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl"
+        className="w-full max-w-lg rounded-t-3xl sm:rounded-3xl bg-white p-5 sm:p-6 shadow-2xl max-h-[90dvh] overflow-hidden flex flex-col pb-[calc(1rem+env(safe-area-inset-bottom,0px))] sm:pb-6"
         role="dialog"
         aria-modal="true"
         aria-label="Cài đặt hệ thống"
       >
-        <div className="mb-5 flex items-start justify-between">
+        {/* Mobile Drag Handle */}
+        <div className="sm:hidden w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-3 shrink-0" />
+
+        <div className="mb-4 sm:mb-5 flex items-start justify-between">
           <div>
             <h2 className="text-base font-bold text-slate-900">Cài đặt Hệ thống & Tự động Zalo</h2>
             <p className="mt-0.5 text-xs text-slate-500">
@@ -65,13 +68,13 @@ export default function SettingsModal({
             type="button"
             onClick={onClose}
             aria-label="Đóng"
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+            className="flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-xl text-slate-400 hover:bg-slate-100 hover:text-slate-600 active:scale-95 transition-all"
           >
-            <X className="w-4 h-4 shrink-0" />
+            <X className="w-5 h-5 shrink-0" />
           </button>
         </div>
 
-        <div className="thin-scroll max-h-[70vh] overflow-y-auto space-y-4 pr-1">
+        <div className="thin-scroll max-h-[60dvh] overflow-y-auto space-y-4 pr-1">
           {/* Ngân hàng VietQR */}
           <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-4 space-y-3">
             <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">
@@ -241,31 +244,31 @@ export default function SettingsModal({
           </p>
         )}
 
-        <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4">
+        <div className="mt-4 sm:mt-5 flex items-center justify-between border-t border-slate-100 pt-3 sm:pt-4">
           <button
             type="button"
             onClick={handleReset}
-            className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 text-xs font-bold text-rose-700 transition-colors hover:bg-rose-100 active:scale-95"
+            className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 text-xs font-bold text-rose-700 transition-colors hover:bg-rose-100 active:scale-95"
             title="Xóa dữ liệu lưu trữ và đưa về 12 phòng mặc định"
           >
             <RotateCcw className="w-3.5 h-3.5 shrink-0" />
-            Khôi phục mặc định
+            <span className="hidden sm:inline">Khôi phục</span> mặc định
           </button>
 
           <div className="flex gap-2">
             <button
               type="button"
               onClick={onClose}
-              className="h-9 rounded-xl border border-slate-200 px-4 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+              className="min-h-[44px] rounded-xl border border-slate-200 px-4 text-xs font-semibold text-slate-600 hover:bg-slate-50 active:scale-95"
             >
               Hủy
             </button>
             <button
               type="submit"
-              className="inline-flex h-9 items-center gap-2 rounded-xl bg-emerald-600 px-4 text-xs font-bold text-white hover:bg-emerald-700 shadow-xs active:scale-95"
+              className="inline-flex min-h-[44px] items-center gap-2 rounded-xl bg-emerald-600 px-4 text-xs font-bold text-white hover:bg-emerald-700 shadow-xs active:scale-95"
             >
               <Save className="w-4 h-4 shrink-0" />
-              Lưu cài đặt
+              Lưu
             </button>
           </div>
         </div>

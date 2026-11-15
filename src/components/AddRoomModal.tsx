@@ -10,7 +10,7 @@ interface Props {
 }
 
 const inputCls =
-  "mt-1.5 block w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20";
+  "mt-1.5 block w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-medium text-slate-800 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20";
 
 export default function AddRoomModal({ existingRooms, onAddRoom, onClose }: Props) {
   const today = getTodayVN();
@@ -99,7 +99,7 @@ export default function AddRoomModal({ existingRooms, onAddRoom, onClose }: Prop
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/60 p-0 sm:p-4 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
@@ -107,18 +107,21 @@ export default function AddRoomModal({ existingRooms, onAddRoom, onClose }: Prop
         aria-modal="true"
         aria-label="Thêm phòng mới"
         onClick={(e) => e.stopPropagation()}
-        className="flex max-h-[90vh] w-full max-w-2xl flex-col rounded-3xl bg-white shadow-2xl"
+        className="flex max-h-[90dvh] w-full max-w-2xl flex-col rounded-t-3xl sm:rounded-3xl bg-white shadow-2xl overflow-hidden pb-[calc(1rem+env(safe-area-inset-bottom,0px))] sm:pb-0"
       >
+        {/* Mobile Drag Handle */}
+        <div className="sm:hidden w-12 h-1.5 bg-slate-300 rounded-full mx-auto my-2.5 shrink-0" />
+
         {/* Header */}
-        <div className="flex items-start justify-between border-b border-slate-100 p-6">
+        <div className="flex items-start justify-between border-b border-slate-100 p-4 sm:p-6">
           <div className="flex items-center gap-3">
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-sm shadow-emerald-200">
               <Plus className="w-5 h-5 shrink-0" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-slate-900">Thêm phòng mới vào tòa nhà</h2>
-              <p className="text-xs text-slate-500">
-                Nhập thông tin phòng, thông tin Zalo khách thuê và thiết lập chu kỳ tính tiền 1 tháng
+              <h2 className="text-base sm:text-lg font-bold text-slate-900">Thêm phòng mới vào tòa nhà</h2>
+              <p className="text-xs text-slate-500 line-clamp-1 sm:line-clamp-none">
+                Nhập thông tin phòng, thông tin Zalo khách thuê và chu kỳ 1 tháng
               </p>
             </div>
           </div>
@@ -126,9 +129,9 @@ export default function AddRoomModal({ existingRooms, onAddRoom, onClose }: Prop
             type="button"
             onClick={onClose}
             aria-label="Đóng"
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+            className="flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-xl text-slate-400 hover:bg-slate-100 hover:text-slate-600 active:scale-95 transition-all"
           >
-            <X className="w-4 h-4 shrink-0" />
+            <X className="w-5 h-5 shrink-0" />
           </button>
         </div>
 
@@ -343,13 +346,13 @@ export default function AddRoomModal({ existingRooms, onAddRoom, onClose }: Prop
             <button
               type="button"
               onClick={onClose}
-              className="h-10 rounded-xl border border-slate-200 px-4 text-xs font-bold text-slate-600 hover:bg-slate-50"
+              className="min-h-[44px] rounded-xl border border-slate-200 px-4 text-xs font-bold text-slate-600 hover:bg-slate-50 active:scale-95 transition-all"
             >
               Hủy
             </button>
             <button
               type="submit"
-              className="inline-flex h-10 items-center gap-2 rounded-xl bg-emerald-600 px-5 text-xs font-bold text-white shadow-sm shadow-emerald-200 transition-all hover:bg-emerald-700 active:scale-95"
+              className="inline-flex min-h-[44px] items-center gap-2 rounded-xl bg-emerald-600 px-5 text-xs font-bold text-white shadow-sm shadow-emerald-200 transition-all hover:bg-emerald-700 active:scale-95"
             >
               <Plus className="w-4 h-4 shrink-0" />
               Thêm phòng vào tòa nhà

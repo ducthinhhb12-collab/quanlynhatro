@@ -304,46 +304,49 @@ export default function ZaloAuthModal({
   const isCurrentAuthorized = isZaloHostAuthorized(session);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-950/60 p-0 sm:p-4 backdrop-blur-sm animate-in fade-in duration-200">
       <div
-        className="w-full max-w-2xl rounded-3xl border border-slate-200/80 bg-white shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+        className="w-full max-w-2xl rounded-t-3xl sm:rounded-3xl border border-slate-200/80 bg-white shadow-2xl overflow-hidden flex flex-col max-h-[90dvh] pb-[calc(1rem+env(safe-area-inset-bottom,0px))] sm:pb-0"
         role="dialog"
         aria-modal="true"
         aria-label="Xác thực & Phiên Zalo Chủ Nhà"
       >
+        {/* Mobile Drag Handle */}
+        <div className="sm:hidden w-12 h-1.5 bg-slate-300 rounded-full mx-auto my-2.5 shrink-0" />
+
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-100 bg-gradient-to-r from-blue-50/80 via-white to-slate-50/50 px-6 py-5">
+        <div className="flex items-center justify-between border-b border-slate-100 bg-gradient-to-r from-blue-50/80 via-white to-slate-50/50 px-4 sm:px-6 py-4 sm:py-5">
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-500/25">
-              <Bot className="h-6 w-6" />
+            <div className="flex h-10 w-10 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-500/25">
+              <Bot className="h-5 w-5 sm:h-6 sm:w-6" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-base font-bold text-slate-900">
-                  Xác Thực & Quản Lý Phiên Zalo Chủ Nhà
+                <h2 className="text-sm sm:text-base font-bold text-slate-900">
+                  Xác Thực Phiên Zalo Chủ Nhà
                 </h2>
                 {isCurrentAuthorized ? (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-bold text-emerald-600 border border-emerald-200">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] sm:text-[11px] font-bold text-emerald-600 border border-emerald-200">
                     <CheckCircle2 className="h-3 w-3" />
                     Đã Kết Nối
                   </span>
                 ) : (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-bold text-amber-600 border border-amber-200">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] sm:text-[11px] font-bold text-amber-600 border border-amber-200">
                     <AlertCircle className="h-3 w-3" />
                     Chưa Xác Thực
                   </span>
                 )}
               </div>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Cấu hình phiên làm việc để Robot AI tự động gửi hóa đơn 4-trong-1 và ký số điện tử.
+              <p className="text-xs text-slate-500 mt-0.5 line-clamp-1 sm:line-clamp-none">
+                Cấu hình phiên để Robot AI tự động gửi hóa đơn 4-trong-1 và ký số điện tử.
               </p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="flex h-9 w-9 items-center justify-center rounded-xl text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition"
-            aria-label="Đóng modal"
+            aria-label="Đóng"
+            className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl text-slate-400 hover:bg-slate-100 hover:text-slate-600 active:scale-95 transition-all"
           >
             <X className="h-5 w-5" />
           </button>
