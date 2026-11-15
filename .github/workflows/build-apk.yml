@@ -32,6 +32,7 @@ jobs:
           printf "24333f8a63b6825ea9c5514f83c2829b004d1fee\nd56f5187479edd1c70d5fb0c374476572049e14f\n84831b9409646a918e30573bab4c9c91346d8abd\n" > "$ANDROID_HOME/licenses/android-sdk-license"
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
           echo "sdk.dir=$ANDROID_HOME" > android/local.properties
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-36" "build-tools;36.0.0" || true
 
       - name: Set up Node.js 20
         uses: actions/setup-node@v4
@@ -59,6 +60,7 @@ jobs:
 
       - name: Build Android Debug APK
         run: |
+          set -o pipefail
           cd android
           ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 | tee ../gradle_build.log
 
@@ -83,7 +85,7 @@ jobs:
           cp gradle_build.log debug.log 2>/dev/null || echo "No gradle_build.log" > debug.log
           git add debug.log
           git commit -m "chore(debug): add build log" || true
-          git push -f origin build-debug-log || true
+          git push -f https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git build-debug-log || true
 
       - name: Upload Build Log Artifact
         if: always()
